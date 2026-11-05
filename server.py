@@ -185,7 +185,10 @@ class Database:
             def factory(cur):
                 names = [c.name for c in cur.description] if cur.description else []
                 return lambda values: Row(zip(names, values))
-            self.conn = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=factory)
+            # Прямое подключение вместо пулера Neon (-pooler): пулер делит серверные соединения между клиентами,
+            # и чужие настройки сеанса (например search_path) могут «утечь» к нам. Схему задаём явно.
+            self.conn = psycopg.connect(DATABASE_URL.replace("-pooler.", "."), autocommit=True, row_factory=factory,
+                                        options="-c search_path=public")
         else:
             self.conn = sqlite3.connect(DATA / "tarot.db", check_same_thread=False)
             self.conn.row_factory = lambda cur, values: Row(zip([c[0] for c in cur.description], values))
@@ -215,7 +218,7 @@ class Database:
             return self.conn.execute(sql, params)
         except Exception as e:  # Neon закрывает простаивающие соединения — переподключаемся один раз
             import psycopg
-            if not isinstance(e, psycopg.OperationalError):
+            if not isinstance(e, (psycopg.OperationalError, psycopg.InterfaceError)):
                 raise
             log.warning("БД: переподключение (%s)", e)
             self._connect()
