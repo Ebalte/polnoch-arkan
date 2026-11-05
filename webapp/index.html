@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Полночный Аркан</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #14101f; --bg2: #1e1830; --bg3: #2a2142;
+    --text: #efe8ff; --hint: #a99cc7;
+    --accent: #d4af37; --accent2: #8a5cf6; --danger: #ff8fa3;
+    --card-back: linear-gradient(145deg, #2b1d52, #3d2a75 50%, #2b1d52);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg) radial-gradient(ellipse at top, #2a1f4a 0%, transparent 60%) no-repeat;
+    color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; padding: 16px 16px 96px;
+  }
+  h1 { font-size: 24px; text-align: center; margin: 8px 0 4px; letter-spacing: .5px; }
+  h1 span { color: var(--accent); }
+  .sub { text-align: center; color: var(--hint); font-size: 14px; margin-bottom: 16px; }
+  .screen { display: none; max-width: 560px; margin: 0 auto; animation: fade .35s ease; }
+  .screen.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .topbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: -6px; }
+  .chip { background: var(--bg2); border: 1px solid #ffffff14; border-radius: 20px; padding: 5px 11px; font-size: 13px; color: var(--hint); cursor: pointer; }
+  .chip b { color: var(--accent); }
+
+  .spreads { display: grid; gap: 8px; }
+  .spread {
+    background: var(--bg2); border: 1px solid #ffffff12; border-radius: var(--radius);
+    padding: 12px 14px; display: flex; gap: 12px; align-items: center; cursor: pointer; transition: transform .15s;
+  }
+  .spread:active { transform: scale(.98); }
+  .spread.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .spread .ico { font-size: 26px; width: 36px; text-align: center; flex: none; }
+  .spread b { display: block; font-size: 15px; }
+  .spread small { color: var(--hint); font-size: 13px; }
+  .spread .lock { margin-left: auto; font-size: 12px; color: var(--accent); white-space: nowrap; }
+
+  label.q { display: block; margin: 16px 0 6px; color: var(--hint); font-size: 14px; }
+  textarea {
+    width: 100%; background: var(--bg2); color: var(--text); border: 1px solid #ffffff1a;
+    border-radius: var(--radius); padding: 12px; font: inherit; font-size: 15px; resize: none; height: 68px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent2); }
+
+  .btn {
+    display: block; width: 100%; margin-top: 14px; padding: 15px; border: 0; border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent2), #b07cff); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  .btn.gold { background: linear-gradient(135deg, #b8902a, var(--accent)); color: #1a1226; }
+  .btn.ghost { background: transparent; border: 1px solid #ffffff2a; color: var(--text); }
+  .btn:disabled { opacity: .55; }
+  .btn:active { opacity: .85; }
+
+  .deck { position: relative; height: 220px; margin: 30px auto; width: 130px; }
+  .deck .c { position: absolute; inset: 0; border-radius: 12px; background: var(--card-back); border: 2px solid var(--accent); box-shadow: 0 6px 20px #0008; }
+  .deck .c::after { content: "✦"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 40px; color: var(--accent); }
+  .deck.shuffling .c:nth-child(1) { animation: sh1 .35s ease-in-out infinite alternate; }
+  .deck.shuffling .c:nth-child(2) { animation: sh2 .35s ease-in-out infinite alternate; }
+  .deck.shuffling .c:nth-child(3) { animation: sh3 .35s ease-in-out infinite alternate; }
+  @keyframes sh1 { to { transform: translateX(-60px) rotate(-12deg); } }
+  @keyframes sh2 { to { transform: translateX(60px) rotate(12deg); } }
+  @keyframes sh3 { to { transform: translateY(-20px); } }
+  .center { text-align: center; color: var(--hint); }
+
+  .question-echo { text-align: center; font-style: italic; color: var(--hint); margin-bottom: 14px; font-size: 14px; }
+  .table { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .slot { width: 30%; max-width: 150px; min-width: 92px; text-align: center; }
+  .table.many .slot { width: 22%; min-width: 70px; }
+  .table.many .pos { font-size: 10px; }
+  .slot .pos { font-size: 12px; color: var(--hint); margin-bottom: 5px; min-height: 15px; line-height: 1.2; }
+  .flip { perspective: 900px; aspect-ratio: 0.58; cursor: pointer; }
+  .flip .inner { position: relative; width: 100%; height: 100%; transition: transform .7s cubic-bezier(.3,.7,.3,1); transform-style: preserve-3d; }
+  .flip.open .inner { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; border-radius: 9px; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+  .face.back { background: var(--card-back); border: 2px solid var(--accent); display: grid; place-items: center; font-size: 26px; color: var(--accent); }
+  .face.front { transform: rotateY(180deg); border: 2px solid var(--accent); background: linear-gradient(170deg, #fdf6e3, #eadcb8); color: #2b1d52; }
+  .face.front img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .face.front .art { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 4px; text-align: center; }
+  .face.front .num { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  .face.front .sym { font-size: 34px; line-height: 1; }
+  .face.front .nm { font-size: 10px; font-weight: 700; text-transform: uppercase; line-height: 1.15; }
+  .face.front.has-img .art { display: none; }
+  .face.front.rev img, .face.front.rev .art { transform: rotate(180deg); }
+  .tap-hint { text-align: center; color: var(--hint); font-size: 13px; margin: 14px 0; }
+  .cardname { font-size: 11px; margin-top: 5px; color: var(--text); line-height: 1.2; min-height: 14px; }
+
+  .reading { margin-top: 16px; display: grid; gap: 10px; }
+  .rcard { background: var(--bg2); border-radius: var(--radius); padding: 14px; border-left: 3px solid var(--accent); animation: fade .4s ease; }
+  .rcard .t { font-size: 12px; color: var(--hint); text-transform: uppercase; letter-spacing: .5px; }
+  .rcard h3 { margin: 4px 0 6px; font-size: 16px; }
+  .rcard h3 .r { font-size: 12px; color: var(--danger); font-weight: 500; }
+  .rcard p { margin: 0; line-height: 1.5; font-size: 15px; white-space: pre-line; }
+  .rcard .kw { margin-top: 8px; font-size: 13px; color: var(--accent); }
+  .summary { background: linear-gradient(135deg, #2b1d52, #3a2470); border-left-color: var(--accent2); }
+  .ad { background: var(--bg2); border-radius: var(--radius); overflow: hidden; border: 1px solid #ffffff14; animation: fade .4s ease; }
+  .ad .lbl { font-size: 11px; color: var(--hint); padding: 8px 12px 0; text-transform: uppercase; letter-spacing: .5px; }
+  .ad img { display: block; width: 100%; max-height: 260px; object-fit: cover; margin-top: 8px; }
+  .ad p { margin: 0; padding: 10px 12px; font-size: 14px; line-height: 1.45; white-space: pre-line; }
+  .ad .btn { margin: 0 12px 12px; width: calc(100% - 24px); padding: 12px; font-size: 15px; }
+  .ad .noad { display: block; text-align: center; font-size: 12px; color: var(--hint); padding: 0 12px 10px; cursor: pointer; text-decoration: underline; }
+  .sub-box { background: linear-gradient(135deg, #3a2a10, #2b1d52); border: 1px solid #d4af3755; }
+  .yesno { font-size: 30px; font-weight: 800; text-align: center; color: var(--accent); margin: 6px 0; }
+
+  .hist-item { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .hist-item .d { font-size: 12px; color: var(--hint); }
+  .hist-item .c { font-size: 14px; margin-top: 4px; }
+  .empty { text-align: center; color: var(--hint); padding: 40px 0; }
+
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; z-index: 5;
+    background: #120e1cf2; backdrop-filter: blur(10px); border-top: 1px solid #ffffff12;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  }
+  nav button { background: none; border: 0; color: var(--hint); font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; padding: 4px 10px; }
+  nav button span { font-size: 21px; }
+  nav button.active { color: var(--accent); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
+  .mini { aspect-ratio: .58; position: relative; cursor: pointer; }
+  .mini .face.front, .big .face.front { transform: none; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 4px; }
+  .tabs button { flex: none; background: var(--bg2); color: var(--hint); border: 1px solid #ffffff14; border-radius: 20px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+  .tabs button.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
+  .modal { position: fixed; inset: 0; background: #000b; display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .modal.open { display: flex; }
+  .sheet { background: var(--bg2); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0; padding: 20px 16px 30px; max-height: 88vh; overflow-y: auto; animation: up .3s ease; }
+  @keyframes up { from { transform: translateY(100%); } to { transform: none; } }
+  .big { width: 130px; margin: 0 auto 12px; aspect-ratio: .58; position: relative; }
+  .sheet h2 { text-align: center; margin: 4px 0 12px; font-size: 20px; }
+  .sheet h4 { margin: 14px 0 4px; color: var(--accent); }
+  .sheet p { margin: 0; line-height: 1.45; }
+
+  .box { background: var(--bg2); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .box h3 { margin: 0 0 6px; font-size: 16px; }
+  .box p { margin: 0; color: var(--hint); font-size: 14px; line-height: 1.4; }
+  .big-num { font-size: 34px; font-weight: 800; color: var(--accent); }
+  .packs { display: grid; gap: 8px; margin-top: 10px; }
+  .pack { display: flex; justify-content: space-between; align-items: center; background: var(--bg3); border-radius: 12px; padding: 12px 14px; cursor: pointer; border: 1px solid transparent; }
+  .pack:active { border-color: var(--accent); }
+  .pack .price { color: var(--accent); font-weight: 700; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #ffffff10; font-size: 15px; }
+  .row:last-child { border: 0; }
+  .switch { width: 46px; height: 26px; border-radius: 13px; background: #ffffff25; position: relative; cursor: pointer; transition: background .2s; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+  .switch.on { background: var(--accent2); }
+  .switch.on::after { left: 23px; }
+  .reflink { background: var(--bg3); border-radius: 10px; padding: 10px; font-size: 13px; word-break: break-all; margin-top: 8px; color: var(--hint); }
+  .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #000d; color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 14px; z-index: 20; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ГЛАВНАЯ -->
+<section id="home" class="screen active">
+  <div class="topbar"><div class="chip" id="creditChip" style="display:none"></div><div class="chip" id="soundChip">🔊</div></div>
+  <h1>🌙 <span>Полночный Аркан</span></h1>
+  <div class="sub">Таро · задай вопрос — карты ответят</div>
+  <div class="spreads" id="spreads"></div>
+  <label class="q" for="question">Твой вопрос (необязательно)</label>
+  <textarea id="question" maxlength="300" placeholder="Например: что меня ждёт в отношениях?"></textarea>
+  <button class="btn" id="startBtn">Перемешать колоду</button>
+</section>
+
+<!-- ТАСОВКА -->
+<section id="shuffle" class="screen">
+  <div class="deck shuffling"><div class="c"></div><div class="c"></div><div class="c"></div></div>
+  <p class="center">Колода перемешивается…<br>Сосредоточься на своём вопросе</p>
+</section>
+
+<!-- РАСКЛАД -->
+<section id="result" class="screen">
+  <h1 id="resTitle"></h1>
+  <div class="question-echo" id="resQuestion"></div>
+  <div class="table" id="table"></div>
+  <div class="tap-hint" id="tapHint">Нажми на карты, чтобы открыть их</div>
+  <button class="btn ghost" id="openAllBtn" style="margin-top:0">Открыть все</button>
+  <div class="reading" id="reading"></div>
+  <div id="resActions" style="display:none">
+    <button class="btn" id="shareBtn">📸 Картинка для сторис</button>
+    <button class="btn ghost" id="againBtn">Новый расклад</button>
+  </div>
+</section>
+
+<!-- КОЛОДА -->
+<section id="deckView" class="screen">
+  <h1>Колода</h1>
+  <div class="sub">78 карт Райдера–Уэйта · нажми, чтобы узнать значение</div>
+  <div class="tabs" id="deckTabs"></div>
+  <div class="grid" id="deckGrid"></div>
+</section>
+
+<!-- ИСТОРИЯ -->
+<section id="history" class="screen">
+  <h1>История</h1>
+  <div class="sub">Твои прошлые расклады</div>
+  <div id="histList"></div>
+</section>
+
+<!-- ПРОФИЛЬ -->
+<section id="profile" class="screen">
+  <h1>Профиль</h1>
+  <div class="sub" id="profName"></div>
+  <div id="profileBody"></div>
+</section>
+
+<nav>
+  <button data-go="home" class="active"><span>🔮</span>Расклад</button>
+  <button data-go="deckView"><span>🃏</span>Колода</button>
+  <button data-go="history"><span>📜</span>История</button>
+  <button data-go="profile"><span>👤</span>Профиль</button>
+</nav>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== КОЛОДА ================== */
+const MAJOR = [
+  ["Шут","🃏","Новое начало, спонтанность, свобода, вера в жизнь","Безрассудство, наивность, риск без расчёта",
+   "Перед тобой открывается новый путь. Сделай шаг без страха — Вселенная поддержит смелость и открытость.",
+   "Будь осторожнее: импульсивное решение может обойтись дорого. Посмотри под ноги, прежде чем прыгать."],
+  ["Маг","🪄","Сила воли, мастерство, действие, ресурсы","Манипуляция, нереализованный потенциал, обман",
+   "У тебя есть всё, чтобы воплотить задуманное. Время действовать и проявлять себя.",
+   "Энергия уходит впустую или кто-то хитрит. Проверь мотивы — свои и чужие."],
+  ["Верховная Жрица","🌙","Интуиция, тайное знание, подсознание, мудрость","Скрытые мотивы, игнорирование интуиции, секреты",
+   "Ответ уже внутри тебя. Прислушайся к интуиции и снам — не всё нужно объяснять логикой.",
+   "Ты заглушаешь внутренний голос. Есть что-то скрытое, что стоит вывести на свет."],
+  ["Императрица","👑","Изобилие, плодородие, забота, красота, творчество","Зависимость, застой, чрезмерная опека",
+   "Период роста и изобилия. Позаботься о себе и о том, что любишь — всё расцветает.",
+   "Ты отдаёшь слишком много и забываешь о себе. Восстанови баланс."],
+  ["Император","🏛️","Структура, власть, стабильность, порядок, отец","Тирания, жёсткость, потеря контроля",
+   "Нужны дисциплина и чёткий план. Возьми ответственность — и ситуация выстроится.",
+   "Слишком много контроля или его отсутствие. Гибкость сейчас важнее силы."],
+  ["Иерофант","📿","Традиции, наставник, духовность, институты","Бунт, нестандартный путь, догмы",
+   "Обратись к проверенным знаниям или к мудрому наставнику. Традиционный путь сработает.",
+   "Правила тебе тесны. Возможно, пора идти своей дорогой, а не чужой."],
+  ["Влюблённые","💞","Любовь, гармония, выбор, союз, ценности","Разлад, неверный выбор, дисбаланс",
+   "Глубокая связь и важный выбор сердцем. Следуй своим истинным ценностям.",
+   "Есть несогласие — с партнёром или с собой. Выбор, сделанный не по сердцу, не принесёт радости."],
+  ["Колесница","🏇","Победа, воля, движение вперёд, контроль","Потеря направления, агрессия, препятствия",
+   "Ты на пути к победе. Держи курс и не позволяй эмоциям разнести тебя в разные стороны.",
+   "Ты тянешь в разные стороны и стоишь на месте. Определи одну цель."],
+  ["Сила","🦁","Внутренняя сила, мужество, терпение, мягкость","Неуверенность, слабость, вспышки гнева",
+   "Мягкость побеждает силу. Ты справишься благодаря терпению и доброте.",
+   "Сомнения подтачивают тебя. Вспомни, через что ты уже прошёл(ла)."],
+  ["Отшельник","🏮","Поиск себя, уединение, мудрость, внутренний свет","Изоляция, одиночество, отказ от помощи",
+   "Время побыть наедине с собой. В тишине придут ответы.",
+   "Уединение превратилось в изоляцию. Пора вернуться к людям."],
+  ["Колесо Фортуны","🎡","Судьба, перемены, удача, циклы","Неудача, сопротивление переменам",
+   "Колесо повернулось в твою пользу. Лови момент — удача рядом.",
+   "Полоса невезения временна. Не борись с течением — оно сменится."],
+  ["Справедливость","⚖️","Правда, честность, закон, причина и следствие","Несправедливость, нечестность, уклонение",
+   "Всё вернётся по заслугам. Действуй честно — и решение будет справедливым.",
+   "Где-то нарушен баланс. Будь честен(на) с собой и не перекладывай ответственность."],
+  ["Повешенный","🙃","Пауза, новый взгляд, жертва, отпускание","Застой, бесполезная жертва, промедление",
+   "Остановись и посмотри иначе. Иногда отпустить — значит получить.",
+   "Ты застрял(а) в ожидании. Хватит жертвовать — нужно решение."],
+  ["Смерть","🦋","Трансформация, завершение, конец эпохи, обновление","Страх перемен, цепляние за прошлое",
+   "Что-то заканчивается, чтобы освободить место новому. Это не потеря, а перерождение.",
+   "Ты держишься за то, что уже ушло. Перемены неизбежны — позволь им случиться."],
+  ["Умеренность","🏺","Баланс, гармония, терпение, исцеление","Крайности, нетерпение, дисбаланс",
+   "Золотая середина — твой ключ. Не торопись, всё складывается постепенно.",
+   "Перекос в одну сторону. Избегай крайностей."],
+  ["Дьявол","😈","Искушение, зависимость, привязанность, материализм","Освобождение, разрыв оков, осознание",
+   "Что-то держит тебя сильнее, чем кажется. Осознай свои цепи — они слабее, чем ты думаешь.",
+   "Ты освобождаешься от того, что держало. Продолжай!"],
+  ["Башня","⚡","Внезапные перемены, крах иллюзий, откровение","Избегание катастрофы, страх перемен",
+   "Резкие перемены разрушат то, что было построено на песке. Освободившееся место — для правды.",
+   "Ты оттягиваешь неизбежное. Лучше перемены сейчас, чем обвал потом."],
+  ["Звезда","⭐","Надежда, вдохновение, исцеление, вера","Отчаяние, потеря веры, разочарование",
+   "После бури приходит надежда. Верь — ты на правильном пути, и мечты сбываются.",
+   "Ты потерял(а) веру. Найди маленький источник света и держись за него."],
+  ["Луна","🌕","Иллюзии, страхи, подсознание, неясность","Ясность, рассеивание страхов, правда",
+   "Не всё так, как кажется. Доверяй интуиции, но проверяй факты.",
+   "Туман рассеивается. Правда выходит на поверхность."],
+  ["Солнце","☀️","Радость, успех, ясность, жизненная сила","Временные трудности, излишний оптимизм",
+   "Одна из лучших карт! Успех, радость и тепло. Всё получится.",
+   "Свет есть, но его закрыли тучи. Радость вернётся — просто немного позже."],
+  ["Суд","📯","Пробуждение, призвание, переоценка, второй шанс","Самокритика, сомнения, игнорирование зова",
+   "Время подвести итоги и услышать своё призвание. Тебе дан второй шанс.",
+   "Ты слишком строг(а) к себе. Прости себя и двигайся дальше."],
+  ["Мир","🌍","Завершение, целостность, достижение, путешествие","Незавершённость, задержки, нехватка закрытия",
+   "Цикл успешно завершён. Ты достиг(ла) цели — наслаждайся моментом.",
+   "Осталось совсем немного до финала. Доведи дело до конца."]
+];
+const ROMAN = ["0","I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI"];
+const SUITS = [
+  { key:"wands", name:"Жезлов", title:"Жезлы", sym:"🔥", sphere:"энергии, амбиций и дела" },
+  { key:"cups", name:"Кубков", title:"Кубки", sym:"🍷", sphere:"чувств, отношений и любви" },
+  { key:"swords", name:"Мечей", title:"Мечи", sym:"⚔️", sphere:"мыслей, конфликтов и решений" },
+  { key:"pentacles", name:"Пентаклей", title:"Пентакли", sym:"🪙", sphere:"денег, работы и материального" }
+];
+const RANKS = [
+  ["Туз","A","Новое начало и чистый потенциал","Упущенный шанс или задержка"],
+  ["Двойка","2","Выбор, партнёрство и баланс","Нерешительность и дисбаланс"],
+  ["Тройка","3","Рост, сотрудничество и первые результаты","Разочарование и разобщённость"],
+  ["Четвёрка","4","Стабильность и передышка","Застой или излишнее упрямство"],
+  ["Пятёрка","5","Испытание, потеря или конфликт","Восстановление после трудностей"],
+  ["Шестёрка","6","Гармония, помощь и движение вперёд","Тоска по прошлому и задержки"],
+  ["Семёрка","7","Проверка на стойкость и выбор стратегии","Сомнения и рассеянность"],
+  ["Восьмёрка","8","Быстрое развитие и усердная работа","Спешка, ошибки или ощущение ловушки"],
+  ["Девятка","9","Близость к цели и почти исполненное желание","Тревога и неудовлетворённость"],
+  ["Десятка","10","Завершение цикла и кульминация","Перегруз и тяжесть ноши"],
+  ["Паж","P","Новости, любопытство и обучение","Незрелость и плохие вести"],
+  ["Рыцарь","Kn","Стремительное действие и поиск","Импульсивность и непостоянство"],
+  ["Королева","Q","Зрелость, забота и мудрость","Эмоциональная нестабильность"],
+  ["Король","K","Власть, мастерство и контроль","Злоупотребление силой"]
+];
+const DECK = [];
+MAJOR.forEach((m, i) => DECK.push({ id:"m"+i, arcana:"major", num:ROMAN[i], name:m[0], sym:m[1], kwUp:m[2], kwRev:m[3], up:m[4], rev:m[5] }));
+SUITS.forEach(s => RANKS.forEach((r, i) => DECK.push({
+  id: s.key + i, arcana: s.key, num: r[1], name: r[0] + " " + s.name, sym: s.sym,
+  kwUp: r[2], kwRev: r[3], up: `${r[2]} в сфере ${s.sphere}.`, rev: `${r[3]} в сфере ${s.sphere}.`
+})));
+const byId = Object.fromEntries(DECK.map(c => [c.id, c]));
+
+/* ================== РАСКЛАДЫ (число карт и premium должны совпадать с server.py) ================== */
+const SPREADS = [
+  { id:"day", ico:"☀️", name:"Карта дня", desc:"Одна карта — совет на сегодня", pos:["Совет дня"] },
+  { id:"yesno", ico:"❓", name:"Да или Нет", desc:"Быстрый ответ на вопрос", pos:["Ответ"] },
+  { id:"three", ico:"⏳", name:"Прошлое · Настоящее · Будущее", desc:"Классика на 3 карты", pos:["Прошлое","Настоящее","Будущее"] },
+  { id:"love", ico:"💞", name:"Отношения", desc:"Ты, партнёр и ваша связь", pos:["Ты","Партнёр","Ваша связь"], premium:true },
+  { id:"thinks", ico:"💭", name:"Что он(а) думает обо мне", desc:"Мысли, чувства, намерения", pos:["Мысли","Чувства","Намерения"], premium:true },
+  { id:"work", ico:"💼", name:"Работа и деньги", desc:"Положение, препятствие, возможность, совет", pos:["Текущее положение","Препятствие","Возможность","Совет"], premium:true },
+  { id:"sit", ico:"🧭", name:"Ситуация", desc:"Суть, препятствие, совет, итог", pos:["Суть","Препятствие","Совет","Итог"], premium:true },
+  { id:"week", ico:"📅", name:"Совет на неделю", desc:"По карте на каждый день", pos:["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"], premium:true },
+  { id:"celtic", ico:"✝️", name:"Кельтский крест", desc:"Самый подробный расклад на 10 карт", pos:["Суть ситуации","Препятствие","Основа","Прошлое","Цель","Ближайшее будущее","Ты сам(а)","Окружение","Надежды и страхи","Итог"], premium:true }
+];
+const YES_CARDS = ["m1","m3","m4","m6","m7","m8","m10","m11","m17","m19","m20","m21"];
+const NO_CARDS  = ["m12","m13","m15","m16","m18"];
+
+/* ================== TELEGRAM ================== */
+const tg = window.Telegram && window.Telegram.WebApp;
+const inTg = !!(tg && tg.initData);
+if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#14101f"); tg.setBackgroundColor("#14101f"); } catch (e) {} }
+const haptic = (t) => { try { tg && tg.HapticFeedback && (t === "ok" ? tg.HapticFeedback.notificationOccurred("success") : tg.HapticFeedback.impactOccurred(t || "light")); } catch (e) {} };
+
+const store = {
+  get(k) { return new Promise(res => {
+    if (inTg && tg.CloudStorage) tg.CloudStorage.getItem(k, (e, v) => res(e ? null : v));
+    else { try { res(localStorage.getItem(k)); } catch (e) { res(null); } }
+  }); },
+  set(k, v) { if (inTg && tg.CloudStorage) tg.CloudStorage.setItem(k, v); else { try { localStorage.setItem(k, v); } catch (e) {} } }
+};
+const lget = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
+const lset = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+/* ================== API ================== */
+let ME = null; // профиль с сервера; null — сервер недоступен (статичный режим)
+async function api(path, body = {}) {
+  const r = await fetch("api/" + path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, initData: tg ? tg.initData : "" }) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || r.status), { status: r.status, data });
+  return data;
+}
+async function loadMe(extra) {
+  try { setMe(await api("me", extra || {})); } catch (e) { setMe(null); }
+  return ME;
+}
+function setMe(me) {
+  ME = me;
+  const chip = $("#creditChip");
+  chip.style.display = ME ? "" : "none";
+  if (ME) chip.innerHTML = ME.sub ? "👑 <b>Безлимит</b>" : `🆓 <b>${ME.freeLeft}</b> · 🔮 <b>${ME.credits}</b>`;
+  renderSpreads();
+}
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day:"numeric", month:"long" });
+
+/* ================== ЗВУК (Web Audio, без файлов) ================== */
+let soundOn = lget("sound", "1") === "1";
+let actx = null;
+function ctx() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } return actx; }
+function noiseBurst(at, dur, freq, gain) {
+  const c = ctx(); if (!c) return;
+  const len = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const src = c.createBufferSource(); src.buffer = buf;
+  const f = c.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.8;
+  const g = c.createGain(); g.gain.value = gain;
+  src.connect(f).connect(g).connect(c.destination); src.start(c.currentTime + at);
+}
+const sfx = {
+  shuffle() { if (!soundOn) return; for (let i = 0; i < 14; i++) noiseBurst(i * 0.11 + Math.random() * 0.03, 0.07, 2500 + Math.random() * 1500, 0.35); },
+  flip() { if (!soundOn) return; noiseBurst(0, 0.18, 1200, 0.5); },
+  chime() {
+    if (!soundOn) return; const c = ctx(); if (!c) return;
+    [659, 880, 1318].forEach((fr, i) => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = "sine"; o.frequency.value = fr;
+      const t = c.currentTime + i * 0.09; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.12, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + 1.3);
+    });
+  }
+};
+function updateSoundChip() { $("#soundChip").textContent = soundOn ? "🔊" : "🔇"; }
+
+/* ================== UI ================== */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+let selectedSpread = SPREADS[0];
+let current = null;
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+  const navId = ["deckView","history","profile"].includes(id) ? id : "home";
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.go === navId));
+  window.scrollTo(0, 0);
+  if (id === "history") renderHistory();
+  if (id === "profile") renderProfile();
+  if (tg && tg.BackButton) (id === "result" ? tg.BackButton.show() : tg.BackButton.hide());
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => { haptic(); show(b.dataset.go); });
+if (tg && tg.BackButton) tg.BackButton.onClick(() => show("home"));
+$("#soundChip").onclick = () => { soundOn = !soundOn; lset("sound", soundOn ? "1" : "0"); updateSoundChip(); if (soundOn) sfx.flip(); };
+$("#creditChip").onclick = () => show("profile");
+updateSoundChip();
+
+function spreadBadge(s) {
+  if (!ME) return s.premium ? '<div class="lock">🔒</div>' : "";
+  if (ME.sub) return "";
+  if (s.premium) return '<div class="lock">🔮 1 расклад</div>';
+  return ME.freeLeft > 0 ? '<div class="lock" style="color:#7ee0a1">бесплатно</div>' : '<div class="lock">🔮 1 расклад</div>';
+}
+function renderSpreads() {
+  $("#spreads").innerHTML = SPREADS.map(s =>
+    `<div class="spread${s.id === selectedSpread.id ? " selected" : ""}" data-id="${s.id}">
+       <div class="ico">${s.ico}</div><div><b>${s.name}</b><small>${s.desc}</small></div>
+       ${spreadBadge(s)}</div>`).join("");
+  document.querySelectorAll(".spread").forEach(el => el.onclick = () => {
+    haptic();
+    selectedSpread = SPREADS.find(s => s.id === el.dataset.id);
+    document.querySelectorAll(".spread").forEach(x => x.classList.toggle("selected", x === el));
+  });
+}
+
+function cardFace(card, reversed) {
+  return `<div class="face front${reversed ? " rev" : ""}">
+    <img src="cards/${card.id}.jpg" alt="" loading="lazy" onload="this.parentNode.classList.add('has-img')" onerror="this.remove()">
+    <div class="art"><div class="num">${card.num}</div><div class="sym">${card.sym}</div><div class="nm">${card.name}</div></div></div>`;
+}
+
+function draw(n) {
+  const pool = DECK.slice(), out = [];
+  for (let i = 0; i < n; i++) {
+    const idx = crypto.getRandomValues(new Uint32Array(1))[0] % pool.length;
+    out.push({ card: pool.splice(idx, 1)[0], reversed: crypto.getRandomValues(new Uint8Array(1))[0] < 77 });
+  }
+  return out;
+}
+
+$("#startBtn").onclick = async () => {
+  const sp = selectedSpread;
+  if (!ME && sp.premium) return toast("Этот расклад доступен при запуске через бота");
+  const btn = $("#startBtn"); btn.disabled = true;
+  haptic("medium"); ctx();
+  const q = $("#question").value.trim();
+  let cards, ad = null;
+  if (ME) {
+    try {
+      const d = await api("draw", { spread: sp.id });
+      setMe(d.me);
+      ad = d.ad;
+      cards = d.cards.map(([id, rv]) => ({ card: byId[id], reversed: !!rv }));
+      if (d.paidBy === "credit") toast(`Списан 1 расклад · осталось ${d.me.credits}`);
+    } catch (e) {
+      btn.disabled = false;
+      if (e.status === 402) { if (e.data.me) setMe(e.data.me); return openShop(sp.premium ? "Это премиум-расклад" : "Бесплатные расклады на сегодня закончились"); }
+      return toast("Нет связи с сервером, попробуй ещё раз");
+    }
+  } else cards = draw(sp.pos.length);
+  sfx.shuffle();
+  show("shuffle");
+  setTimeout(() => {
+    btn.disabled = false;
+    current = { spread: sp, question: q, cards, date: Date.now(), ad };
+    renderResult(current, false);
+    show("result");
+    haptic("ok");
+  }, 1700);
+};
+
+function renderResult(r, openAll) {
+  $("#resTitle").textContent = r.spread.ico + " " + r.spread.name;
+  $("#resQuestion").textContent = r.question ? "«" + r.question + "»" : "";
+  $("#reading").innerHTML = "";
+  $("#resActions").style.display = "none";
+  $("#tapHint").style.display = openAll ? "none" : "block";
+  $("#openAllBtn").style.display = !openAll && r.cards.length > 3 ? "block" : "none";
+  $("#table").className = "table" + (r.cards.length >= 5 ? " many" : "");
+  $("#table").innerHTML = r.cards.map((c, i) => `
+    <div class="slot"><div class="pos">${r.spread.pos[i]}</div>
+      <div class="flip${openAll ? " open" : ""}" data-i="${i}"><div class="inner">
+        <div class="face back">✦</div>${cardFace(c.card, c.reversed)}</div></div>
+      <div class="cardname">${openAll ? c.card.name : ""}</div></div>`).join("");
+  r._opened = new Set();
+  if (openAll) { r.cards.forEach((_, i) => addReading(r, i)); finish(r, false); return; }
+  document.querySelectorAll("#table .flip").forEach(el => el.onclick = () => openCardAt(r, el));
+}
+function openCardAt(r, el) {
+  const i = +el.dataset.i;
+  if (r._opened.has(i)) return;
+  r._opened.add(i);
+  haptic("medium"); sfx.flip();
+  el.classList.add("open");
+  el.parentNode.querySelector(".cardname").textContent = r.cards[i].card.name;
+  addReading(r, i);
+  if (r._opened.size === r.cards.length) {
+    $("#openAllBtn").style.display = "none"; $("#tapHint").style.display = "none";
+    setTimeout(() => finish(r, true), 400);
+  }
+}
+$("#openAllBtn").onclick = () => {
+  document.querySelectorAll("#table .flip").forEach((el, k) => setTimeout(() => openCardAt(current, el), k * 180));
+};
+
+function addReading(r, i) {
+  const { card, reversed } = r.cards[i];
+  const div = document.createElement("div");
+  div.className = "rcard";
+  div.innerHTML = `<div class="t">${r.spread.pos[i]}</div>
+    <h3>${card.sym} ${card.name} ${reversed ? '<span class="r">(перевёрнутая)</span>' : ""}</h3>
+    <p>${reversed ? card.rev : card.up}</p><div class="kw">✦ ${reversed ? card.kwRev : card.kwUp}</div>`;
+  $("#reading").appendChild(div);
+}
+
+function yesNo(c) {
+  let score = YES_CARDS.includes(c.card.id) ? 2 : NO_CARDS.includes(c.card.id) ? -2 : (c.card.arcana === "swords" ? -1 : 1);
+  if (c.reversed) score = -score;
+  return score >= 2 ? "ДА" : score > 0 ? "Скорее да" : score <= -2 ? "НЕТ" : "Скорее нет";
+}
+function summaryText(r) {
+  if (r.cards.length === 1) return "Держи эту карту в мыслях сегодня — она подскажет, на что обратить внимание.";
+  const majors = r.cards.filter(c => c.card.arcana === "major").length, revs = r.cards.filter(c => c.reversed).length, parts = [];
+  if (majors >= Math.ceil(r.cards.length / 2)) parts.push("Много Старших Арканов — ситуация важная, в ней работают силы судьбы.");
+  if (revs === 0) parts.push("Все карты прямые — энергия течёт свободно, путь открыт.");
+  else if (revs >= Math.ceil(r.cards.length / 2)) parts.push("Много перевёрнутых карт — есть внутренние блоки, которые стоит проработать.");
+  const counts = {};
+  r.cards.forEach(c => { if (c.card.arcana !== "major") counts[c.card.arcana] = (counts[c.card.arcana] || 0) + 1; });
+  const dom = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (dom && dom[1] >= 2) { const s = SUITS.find(x => x.key === dom[0]); parts.push(`Преобладают ${s.title} — главное сейчас в сфере ${s.sphere}.`); }
+  const last = r.cards[r.cards.length - 1];
+  parts.push(`Итоговая карта — ${last.card.name}${last.reversed ? " (перевёрнутая)" : ""}: ${(last.reversed ? last.card.kwRev : last.card.kwUp).toLowerCase()}.`);
+  return parts.join(" ");
+}
+
+async function finish(r, save) {
+  const div = document.createElement("div");
+  div.className = "rcard summary";
+  div.innerHTML = r.spread.id === "yesno"
+    ? `<div class="t">Ответ карт</div><div class="yesno">${yesNo(r.cards[0])}</div>`
+    : `<div class="t">Общий смысл</div><p>${summaryText(r)}</p>`;
+  $("#reading").appendChild(div);
+  sfx.chime();
+  if (r.ad) $("#reading").appendChild(adCard(r.ad));
+  $("#resActions").style.display = "block";
+  if (save) await saveHistory(r);
+}
+
+/* ================== РЕКЛАМА (настраивается в боте: /admin) ================== */
+function adCard(ad) {
+  const el = document.createElement("div");
+  el.className = "ad";
+  el.innerHTML = `<div class="lbl">Реклама</div>${ad.image ? `<img src="${esc(ad.image)}" alt="">` : ""}<p></p>
+    ${ad.url ? `<button class="btn gold"></button>` : ""}<span class="noad">Убрать рекламу — Безлимит 👑</span>`;
+  el.querySelector("p").textContent = ad.text;
+  if (!ad.text) el.querySelector("p").remove();
+  const go = () => {
+    if (!ad.url) return;
+    api("ad_click", { id: ad.id }).catch(() => {});
+    haptic();
+    if (inTg) { /^https:\/\/t\.me\//.test(ad.url) ? tg.openTelegramLink(ad.url) : tg.openLink(ad.url); }
+    else window.open(ad.url, "_blank");
+  };
+  if (ad.url) { const b = el.querySelector(".btn"); b.textContent = ad.button || "Подробнее"; b.onclick = go; }
+  if (ad.image && ad.url) { el.querySelector("img").style.cursor = "pointer"; el.querySelector("img").onclick = go; }
+  el.querySelector(".noad").onclick = () => openShop("Без рекламы");
+  return el;
+}
+
+/* ================== ИСТОРИЯ ================== */
+async function loadHistory() { const raw = await store.get("history"); try { return JSON.parse(raw) || []; } catch (e) { return []; } }
+async function saveHistory(r) {
+  let h = await loadHistory();
+  h.unshift({ s: r.spread.id, q: r.question, d: r.date, c: r.cards.map(c => [c.card.id, c.reversed ? 1 : 0]) });
+  // CloudStorage: ≤4096 символов на ключ — урезаем
+  while (h.length && JSON.stringify(h).length > 4000) h.pop();
+  store.set("history", JSON.stringify(h));
+}
+async function renderHistory() {
+  const h = await loadHistory();
+  if (!h.length) { $("#histList").innerHTML = `<div class="empty">Пока пусто.<br>Сделай первый расклад ✨</div>`; return; }
+  $("#histList").innerHTML = h.map((it, i) => {
+    const sp = SPREADS.find(s => s.id === it.s); if (!sp) return "";
+    const names = it.c.map(([id]) => byId[id] ? byId[id].name : "?").join(" · ");
+    return `<div class="hist-item" data-i="${i}"><div class="d">${new Date(it.d).toLocaleString("ru-RU", { day:"numeric", month:"long", hour:"2-digit", minute:"2-digit" })} · ${sp.ico} ${sp.name}</div>
+      ${it.q ? `<div class="c"><i>«${esc(it.q)}»</i></div>` : ""}<div class="c">${names}</div></div>`;
+  }).join("");
+  document.querySelectorAll(".hist-item").forEach(el => el.onclick = () => {
+    const it = h[+el.dataset.i];
+    current = { spread: SPREADS.find(s => s.id === it.s), question: it.q, date: it.d,
+      cards: it.c.map(([id, rv]) => ({ card: byId[id], reversed: !!rv })) };
+    renderResult(current, true);
+    show("result");
+  });
+}
+
+/* ================== МАГАЗИН / ПРОФИЛЬ ================== */
+function subHtml() {
+  if (ME.sub && new Date(ME.subUntil).getFullYear() >= 2099) return `<div class="box sub-box"><h3>♾ Безлимит навсегда</h3><p>Все расклады без ограничений и без рекламы. Подарок от нас ✨</p></div>`;
+  if (ME.sub) return `<div class="box sub-box"><h3>👑 Безлимит активен</h3><p>Все расклады без ограничений до ${fmtDate(ME.subUntil)}. Если оформлял(а) подписку — продлится автоматически; отменить: Настройки Telegram → Мои звёзды.</p></div>`;
+  return `<div class="box sub-box"><h3>👑 Безлимит</h3>
+    <p>Все 9 раскладов без ограничений, включая «Кельтский крест» и «Что он(а) думает обо мне», и без рекламы. Отмена в любой момент.</p>
+    <button class="btn gold" data-buy="sub">${ME.subOffer.stars} ⭐ в месяц</button></div>`;
+}
+function packsHtml() {
+  return `<div class="packs">${Object.entries(ME.packs).map(([id, p]) =>
+    `<div class="pack" data-buy="${id}"><span>🔮 ${p.title}</span><span class="price">${p.stars} ⭐</span></div>`).join("")}</div>`;
+}
+function bindBuy(root) { root.querySelectorAll("[data-buy]").forEach(el => el.onclick = () => buy(el.dataset.buy)); }
+async function buy(item) {
+  haptic("medium");
+  try {
+    const d = await api("invoice", { item });
+    if (d.dev) { await loadMe(); toast("DEV: оплата зачтена"); afterPurchase(); return; }
+    tg.openInvoice(d.link, async (status) => {
+      if (status === "paid") {
+        haptic("ok"); sfx.chime();
+        const before = JSON.stringify([ME.credits, ME.sub]);
+        for (let i = 0; i < 6; i++) { await new Promise(r => setTimeout(r, 800)); await loadMe(); if (JSON.stringify([ME.credits, ME.sub]) !== before) break; }
+        toast(item === "sub" ? "Безлимит активирован 👑" : "Спасибо! Расклады начислены ✨"); afterPurchase();
+      } else if (status === "failed") toast("Оплата не прошла");
+    });
+  } catch (e) { toast("Не удалось создать счёт"); }
+}
+function afterPurchase() {
+  closeModal();
+  if ($("#profile").classList.contains("active")) renderProfile();
+}
+function openShop(title) {
+  $("#sheet").innerHTML = `<h2>${title || "Больше раскладов"}</h2>
+    ${subHtml()}
+    <div class="box"><h3>🔮 Купить расклады</h3><p>1 расклад = любой расклад на выбор. Не сгорают.</p>${packsHtml()}</div>
+    <div class="box"><h3>🎁 Бесплатно за друзей</h3><p>Пригласи друга — получите оба по +${ME.refBonus} расклада.</p>
+    <button class="btn ghost" id="shopInvite">Пригласить друга</button></div>
+    <button class="btn ghost" onclick="closeModal()">Закрыть</button>`;
+  bindBuy($("#sheet")); $("#shopInvite").onclick = invite;
+  $("#modal").classList.add("open");
+}
+function invite() {
+  const text = `🌙 «Полночный Аркан» — таро прямо в Telegram. По моей ссылке — ${ME.refBonus} расклада в подарок!`;
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(ME.refLink) + "&text=" + encodeURIComponent(text);
+  inTg ? tg.openTelegramLink(url) : (navigator.clipboard && navigator.clipboard.writeText(ME.refLink), toast("Ссылка скопирована"));
+}
+function renderProfile() {
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  $("#profName").textContent = u ? "Привет, " + u.first_name + "!" : "";
+  if (!ME) { $("#profileBody").innerHTML = `<div class="empty">Профиль доступен при запуске через бота.</div>` + settingsHtml(); bindSettings(); return; }
+  $("#profileBody").innerHTML = `
+    <div class="box" style="display:flex;justify-content:space-around;text-align:center">
+      <div><p>Бесплатно сегодня</p><div class="big-num">${ME.sub ? "∞" : ME.freeLeft}</div><p style="font-size:12px">из ${ME.freePerDay} простых</p></div>
+      <div><p>Твои расклады</p><div class="big-num">${ME.sub ? "∞" : ME.credits}</div><p style="font-size:12px">на любые</p></div>
+    </div>
+    ${subHtml()}
+    <div class="box"><h3>🔮 Купить расклады</h3><p>1 расклад = любой расклад на выбор. Не сгорают.</p>${packsHtml()}</div>
+    <div class="box"><h3>🎁 Пригласи друга</h3><p>За каждого друга — +${ME.refBonus} расклада тебе и ему. Приглашено: <b>${ME.refs}</b></p>
+      <div class="reflink">${esc(ME.refLink)}</div><button class="btn" id="invBtn">Пригласить</button></div>
+    ${settingsHtml()}`;
+  bindBuy($("#profileBody"));
+  $("#invBtn").onclick = invite;
+  bindSettings();
+}
+function settingsHtml() {
+  return `<div class="box"><h3>⚙️ Настройки</h3>
+    ${ME ? `<div class="row"><span>☀️ «Карта дня» в ${ME.dailyHour}:00</span><div class="switch${ME.daily ? " on" : ""}" id="swDaily"></div></div>` : ""}
+    <div class="row"><span>🔊 Звуки</span><div class="switch${soundOn ? " on" : ""}" id="swSound"></div></div></div>`;
+}
+function bindSettings() {
+  $("#swSound").onclick = (e) => { soundOn = !soundOn; lset("sound", soundOn ? "1" : "0"); e.target.classList.toggle("on", soundOn); updateSoundChip(); haptic(); };
+  if ($("#swDaily")) $("#swDaily").onclick = async (e) => { haptic(); e.target.classList.toggle("on"); await loadMe({ daily: e.target.classList.contains("on") }); toast(ME && ME.daily ? "«Карта дня» включена" : "«Карта дня» выключена"); };
+}
+
+/* ================== КАРТИНКА ДЛЯ СТОРИС ================== */
+function loadImg(src) { return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function wrap(g, text, x, y, maxW, lh, maxLines) {
+  const words = text.split(" "); let line = "", lines = 0;
+  for (const w of words) {
+    const t = line ? line + " " + w : w;
+    if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; if (++lines >= maxLines - 1) { line = line + "…"; break; } }
+    else line = t;
+  }
+  g.fillText(line, x, y); return y + lh;
+}
+async function makeStory(r) {
+  const W = 1080, H = 1920, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#2a1f4a"); bg.addColorStop(1, "#0f0b18"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(255,240,200,${Math.random() * .6})`; g.beginPath(); g.arc(Math.random() * W, Math.random() * H, Math.random() * 2.2, 0, 7); g.fill(); }
+  g.textAlign = "center"; g.fillStyle = "#d4af37"; g.font = "700 60px sans-serif"; g.fillText("🌙 ПОЛНОЧНЫЙ АРКАН", W / 2, 180);
+  g.fillStyle = "#efe8ff"; g.font = "600 52px sans-serif"; g.fillText(r.spread.name, W / 2, 270);
+  let y = 340;
+  if (r.question) { g.fillStyle = "#a99cc7"; g.font = "italic 40px sans-serif"; y = wrap(g, "«" + r.question + "»", W / 2, y, W - 160, 52, 3); }
+  const n = r.cards.length, cols = n <= 3 ? n : n === 4 ? 2 : n <= 6 ? 3 : n <= 8 ? 4 : 5;
+  const rows = Math.ceil(n / cols), gap = 30, cw = Math.min(300, (W - 120 - gap * (cols - 1)) / cols), ch = cw / .58;
+  const areaTop = y + 30, areaH = 1500 - areaTop, total = rows * (ch + 120) - 40;
+  let top = areaTop + Math.max(0, (areaH - total) / 2);
+  const imgs = await Promise.all(r.cards.map(c => loadImg("cards/" + c.card.id + ".jpg")));
+  for (let i = 0; i < n; i++) {
+    const row = Math.floor(i / cols), inRow = Math.min(cols, n - row * cols), col = i % cols;
+    const x = (W - (inRow * cw + (inRow - 1) * gap)) / 2 + col * (cw + gap), yy = top + row * (ch + 120);
+    g.fillStyle = "#a99cc7"; g.font = `${n > 5 ? 24 : 32}px sans-serif`; g.fillText(r.spread.pos[i], x + cw / 2, yy - 14);
+    g.save(); roundRect(g, x, yy, cw, ch, 16); g.clip();
+    g.fillStyle = "#f3e9cf"; g.fillRect(x, yy, cw, ch);
+    const c = r.cards[i];
+    if (imgs[i]) { g.translate(x + cw / 2, yy + ch / 2); if (c.reversed) g.rotate(Math.PI); g.drawImage(imgs[i], -cw / 2, -ch / 2, cw, ch); }
+    else { g.fillStyle = "#2b1d52"; g.font = `${cw * .35}px sans-serif`; g.fillText(c.card.sym, x + cw / 2, yy + ch / 2 + cw * .12); }
+    g.restore();
+    g.strokeStyle = "#d4af37"; g.lineWidth = 5; roundRect(g, x, yy, cw, ch, 16); g.stroke();
+    g.fillStyle = "#efe8ff"; g.font = `600 ${n > 5 ? 24 : 34}px sans-serif`;
+    wrap(g, c.card.name + (c.reversed ? " ↺" : ""), x + cw / 2, yy + ch + (n > 5 ? 34 : 46), cw + gap, n > 5 ? 28 : 40, 2);
+  }
+  g.fillStyle = "#d4af37"; g.font = "600 44px sans-serif";
+  if (r.spread.id === "yesno") g.fillText("Ответ: " + yesNo(r.cards[0]), W / 2, 1620);
+  g.fillStyle = "#a99cc7"; g.font = "38px sans-serif"; g.fillText(ME ? "Сделай свой расклад: @" + ME.bot : "Сделай свой расклад в Telegram", W / 2, 1800);
+  return cv.toDataURL("image/png");
+}
+$("#shareBtn").onclick = async () => {
+  const btn = $("#shareBtn"); btn.disabled = true; haptic("medium");
+  try {
+    const png = await makeStory(current);
+    if (ME) {
+      const d = await api("share", { image: png });
+      if (inTg && tg.shareToStory && tg.isVersionAtLeast && tg.isVersionAtLeast("7.8")) {
+        tg.shareToStory(d.url, { text: "Мой расклад в «Полночном Аркане» 🌙", widget_link: { url: ME.refLink, name: "Сделать расклад" } });
+      }
+      toast(d.sent ? "Картинка отправлена тебе в чат — перешли друзьям ✨" : "Картинка готова");
+      if (!inTg) downloadPng(png);
+    } else downloadPng(png);
+  } catch (e) { toast("Не удалось сделать картинку"); }
+  btn.disabled = false;
+};
+function downloadPng(png) { const a = document.createElement("a"); a.href = png; a.download = "tarot.png"; a.click(); }
+
+/* ================== КОЛОДА ================== */
+const DECK_TABS = [{ key:"major", title:"Старшие" }, ...SUITS.map(s => ({ key: s.key, title: s.title }))];
+let deckTab = "major";
+function renderDeck() {
+  $("#deckTabs").innerHTML = DECK_TABS.map(t => `<button data-k="${t.key}" class="${t.key === deckTab ? "active" : ""}">${t.title}</button>`).join("");
+  document.querySelectorAll("#deckTabs button").forEach(b => b.onclick = () => { haptic(); deckTab = b.dataset.k; renderDeck(); });
+  $("#deckGrid").innerHTML = DECK.filter(c => c.arcana === deckTab).map(c => `<div class="mini" data-id="${c.id}">${cardFace(c, false)}</div>`).join("");
+  document.querySelectorAll("#deckGrid .mini").forEach(el => el.onclick = () => openCard(byId[el.dataset.id]));
+}
+function openCard(c) {
+  haptic();
+  $("#sheet").innerHTML = `<div class="big">${cardFace(c, false)}</div><h2>${c.name}</h2>
+    <h4>⬆ Прямое положение</h4><p><b>${c.kwUp}.</b> ${c.up}</p>
+    <h4>⬇ Перевёрнутое положение</h4><p><b>${c.kwRev}.</b> ${c.rev}</p>
+    <button class="btn ghost" onclick="closeModal()">Закрыть</button>`;
+  $("#modal").classList.add("open");
+}
+function closeModal() { $("#modal").classList.remove("open"); }
+$("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
+
+renderSpreads();
+renderDeck();
+loadMe();
+</script>
+</body>
+</html>

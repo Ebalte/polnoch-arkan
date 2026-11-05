@@ -1,0 +1,27 @@
+# Render Blueprint: сервер + бот «Полночный Аркан» в одном бесплатном сервисе.
+# Render → New → Blueprint → выберите этот репозиторий. Переменные с sync: false Render спросит при создании.
+services:
+  - type: web
+    name: polnoch-arkan
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL        # строка подключения Neon (postgresql://...?sslmode=require)
+        sync: false
+      - key: BOT_TOKEN           # токен бота от @BotFather
+        sync: false
+      - key: ADMIN_IDS           # ваш Telegram ID (через запятую, если админов несколько)
+        sync: false
+      - key: SUPPORT_CONTACT     # контакт для вопросов по оплате, например @your_name
+        sync: false
+      - key: BOT_MODE
+        value: webhook
+      - key: WEBHOOK_SECRET
+        generateValue: true
