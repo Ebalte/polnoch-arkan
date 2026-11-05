@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import datetime as dt
+import hashlib
 import json
 import logging
 import os
@@ -48,7 +49,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 WEBAPP_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "http://localhost:8080").rstrip("/") + "/"
 PORT = int(os.getenv("PORT", "8080"))
 BOT_MODE = os.getenv("BOT_MODE", "polling")              # webhook — на сервере, polling — локально
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET") or secrets.token_urlsafe(24)
+# Telegram принимает в секрете вебхука только A-Z a-z 0-9 _ -, а Render генерирует base64 с + / =.
+# Поэтому берём хэш: из любого значения получается допустимый и всегда одинаковый секрет.
+WEBHOOK_SECRET = hashlib.sha256((os.getenv("WEBHOOK_SECRET") or os.getenv("BOT_TOKEN") or "dev").encode()).hexdigest()
 DAILY_HOUR = int(os.getenv("DAILY_HOUR", "9"))        # во сколько рассылать «Карту дня»
 TZ = ZoneInfo(os.getenv("TZ_NAME", "Europe/Moscow"))
 FREE_PER_DAY = int(os.getenv("FREE_PER_DAY", "3"))    # бесплатных простых раскладов в день
