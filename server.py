@@ -28,6 +28,8 @@ from zoneinfo import ZoneInfo
 import aiohttp
 from aiohttp import web
 
+import matrix as matrix_mod
+
 ROOT = Path(__file__).resolve().parent
 
 
@@ -42,8 +44,9 @@ def load_dotenv() -> None:
                 os.environ.setdefault(k.strip(), v.strip())
 
 
-load_dotenv()
 DEV = os.getenv("DEV") == "1" or "--dev" in sys.argv  # локальный тест без Telegram
+if not DEV:
+    load_dotenv()  # в DEV .env не читаем: там боевой токен и база — предпросмотр их не трогает
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 # адрес сервера; на Render подставляется сам (RENDER_EXTERNAL_URL)
 WEBAPP_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "http://localhost:8080").rstrip("/") + "/"
@@ -108,6 +111,7 @@ SPREADS = {
     "day": (1, "basic"), "yesno": (1, "basic"), "three": (3, "basic"),
     "work": (4, "premium"), "week": (7, "premium"), "love": (3, "premium"),
     "thinks": (3, "premium"), "sit": (4, "premium"), "celtic": (10, "premium"),
+    "fullmoon": (3, "basic"), "newmoon": (3, "basic"),   # особые расклады полнолуния и новолуния
 }
 
 
@@ -128,10 +132,23 @@ CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS ads(
   id {SERIAL}, text TEXT, image TEXT, url TEXT, button TEXT,
   active INTEGER DEFAULT 0, views INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, created TEXT);
+CREATE TABLE IF NOT EXISTS promos(
+  code TEXT PRIMARY KEY, kind TEXT, amount INTEGER, max_uses INTEGER, used INTEGER DEFAULT 0,
+  expires TEXT, created TEXT, active INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS promo_uses(code TEXT, user_id BIGINT, created TEXT, PRIMARY KEY(code, user_id));
+CREATE TABLE IF NOT EXISTS matrix_unlocks(user_id BIGINT, bdate TEXT, created TEXT, PRIMARY KEY(user_id, bdate));
 """
+# новые колонки в уже существующих таблицах (в том числе в живой базе Neon)
+MIGRATIONS = [
+    ("users", "sub_until TEXT"), ("users", "free_date TEXT"), ("users", "free_used INTEGER DEFAULT 0"),
+    ("users", "username TEXT"), ("users", "daily_hour INTEGER"), ("users", "daily_last TEXT"),
+    ("payments", "refunded TEXT"),
+    ("draws", "question TEXT"), ("draws", "note TEXT"), ("draws", "outcome TEXT"),
+]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS users_username ON users(username);
 CREATE INDEX IF NOT EXISTS draws_created ON draws(created);
+CREATE INDEX IF NOT EXISTS draws_user ON draws(user_id, id);
 """
 
 
@@ -148,7 +165,12 @@ class Database:
         self.pg = DATABASE_URL.startswith(("postgres://", "postgresql://"))
         self._connect()
         if self.pg:
-            for stmt in (SCHEMA.replace("{SERIAL}", "BIGSERIAL PRIMARY KEY") + INDEXES).split(";"):
+            for stmt in SCHEMA.replace("{SERIAL}", "BIGSERIAL PRIMARY KEY").split(";"):
+                if stmt.strip():
+                    self.conn.execute(stmt)
+            for table, col in MIGRATIONS:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col}")
+            for stmt in INDEXES.split(";"):
                 if stmt.strip():
                     self.conn.execute(stmt)
         else:
@@ -170,8 +192,7 @@ class Database:
 
     def _sqlite_upgrade(self) -> None:
         """Старые локальные базы: добавить новые колонки, перенести платежи на колонку rid."""
-        for table, col in (("users", "sub_until TEXT"), ("users", "free_date TEXT"),
-                           ("users", "free_used INTEGER DEFAULT 0"), ("users", "username TEXT"), ("payments", "refunded TEXT")):
+        for table, col in MIGRATIONS:
             try:
                 self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
             except sqlite3.OperationalError:
@@ -276,8 +297,46 @@ def profile(u: sqlite3.Row) -> dict:
         "sub": sub_active(u), "subUntil": u["sub_until"] if sub_active(u) else None,
         "daily": bool(u["daily"]), "refs": u["refs"], "refBonus": REF_BONUS,
         "bot": BOT_USERNAME, "refLink": f"https://t.me/{BOT_USERNAME}?start=ref_{u['id']}",
-        "packs": PACKS, "subOffer": SUB, "dailyHour": DAILY_HOUR, "dev": DEV,
+        "packs": PACKS, "subOffer": SUB, "dailyHour": u["daily_hour"] if u["daily_hour"] is not None else DAILY_HOUR,
+        "dev": DEV,
     }
+
+
+def charge_premium(uid: int) -> str | None:
+    """Списать «премиум-действие»: при безлимите бесплатно, иначе 1 расклад. None — нечем платить."""
+    if sub_active(user_row(uid)):
+        return "sub"
+    cur = db.execute("UPDATE users SET credits=credits-1 WHERE id=? AND credits>0", (uid,))
+    db.commit()
+    return "credit" if cur.rowcount else None
+
+
+# ───────────────────────── промокоды ─────────────────────────
+def apply_promo(uid: int, code: str) -> tuple[bool, str]:
+    code = (code or "").strip().upper()
+    p = db.execute("SELECT * FROM promos WHERE code=?", (code,)).fetchone()
+    if not p or not p["active"]:
+        return False, "Такого промокода нет"
+    if p["expires"] and dt.datetime.fromisoformat(p["expires"]) < utcnow():
+        return False, "Срок действия промокода закончился"
+    if p["max_uses"] and p["used"] >= p["max_uses"]:
+        return False, "Промокод уже использовали максимальное число раз"
+    cur = db.execute("INSERT INTO promo_uses(code,user_id,created) VALUES(?,?,?) ON CONFLICT DO NOTHING",
+                     (code, uid, utcnow().isoformat()))
+    if cur.rowcount == 0:
+        db.commit()
+        return False, "Ты уже активировал(а) этот промокод"
+    db.execute("UPDATE promos SET used=used+1 WHERE code=?", (code,))
+    if p["kind"] == "sub":
+        u = user_row(uid)
+        base = dt.datetime.fromisoformat(u["sub_until"]) if sub_active(u) else utcnow()
+        db.execute("UPDATE users SET sub_until=? WHERE id=?", ((base + dt.timedelta(days=p["amount"])).isoformat(), uid))
+        msg = f"👑 Безлимит на {p['amount']} дн. активирован!"
+    else:
+        db.execute("UPDATE users SET credits=credits+? WHERE id=?", (p["amount"], uid))
+        msg = f"🔮 +{p['amount']} раскладов на баланс!"
+    db.commit()
+    return True, msg
 
 
 # ───────────────────────── бот ─────────────────────────
@@ -321,6 +380,9 @@ if BOT_TOKEN:
                 await bot.send_message(user["ref_by"], f"🎉 По твоей ссылке пришёл друг! +{REF_BONUS} расклада.")
             except Exception:
                 pass
+        if command.args and command.args.startswith("promo_"):
+            ok, msg = apply_promo(user["id"], command.args[6:])
+            await message.answer(("🎟 " if ok else "❌ ") + msg)
 
     @dp.message(Command("daily"))
     async def cmd_daily(message: Message, command: CommandObject) -> None:
@@ -384,7 +446,17 @@ if BOT_TOKEN:
     class GiveForm(StatesGroup):
         who = State()
 
+    class CastForm(StatesGroup):
+        content = State()
+        button = State()
+
+    class PromoForm(StatesGroup):
+        code = State()
+        amount = State()
+        limits = State()
+
     ADMIN_MENU = kb([("📊 Статистика", "adm:stats")], [("👑 Выдать безлимит", "adm:give")],
+                    [("📨 Рассылка", "adm:cast"), ("🎟 Промокоды", "adm:promos")],
                     [("💸 Платежи и возвраты", "adm:pays:0")], [("📢 Реклама на странице расклада", "adm:ads")])
     BACK = [("⬅️ В меню", "adm:menu")]
     ITEM_NAMES = {**{k: v["title"] for k, v in PACKS.items()}, "sub": "Безлимит"}
@@ -746,6 +818,174 @@ if BOT_TOKEN:
                              reply_markup=kb([("✅ Запустить", f"adm:adon:{ad['id']}"), ("🗑 Удалить", f"adm:addel:{ad['id']}")], BACK))
 
     # обычные сообщения (не в процессе заполнения формы)
+    # ── 📨 рассылка ──
+    def cast_markup(d: dict) -> InlineKeyboardMarkup:
+        if d.get("url"):
+            return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=d["btn"], url=d["url"])]])
+        return app_kb(d.get("btn") or "🔮 Сделать расклад")
+
+    async def send_cast(chat_id: int, d: dict) -> None:
+        if d.get("photo"):
+            await bot.send_photo(chat_id, d["photo"], caption=d.get("text") or None, reply_markup=cast_markup(d))
+        else:
+            await bot.send_message(chat_id, d["text"], reply_markup=cast_markup(d))
+
+    @dp.callback_query(F.data == "adm:cast", is_admin)
+    async def adm_cast(cb: CallbackQuery, state: FSMContext) -> None:
+        n = db.execute("SELECT COUNT(*) FROM users WHERE blocked=0").fetchone()[0]
+        await state.set_state(CastForm.content)
+        await edit(cb, f"📨 Рассылка ({n} получателей)\n\nШаг 1/2. Пришли сообщение: текст или фото с подписью.\n\nОтмена: /cancel", kb(BACK))
+
+    @dp.message(CastForm.content, is_admin)
+    async def adm_cast_content(message: Message, state: FSMContext) -> None:
+        text = message.caption if message.photo else message.text
+        if not text and not message.photo:
+            await message.answer("Нужен текст или фото. Или /cancel")
+            return
+        await state.update_data(text=text or "", photo=message.photo[-1].file_id if message.photo else None)
+        await state.set_state(CastForm.button)
+        await message.answer("Шаг 2/2. Кнопка под сообщением:\n"
+                             "• «-» — кнопка «🔮 Сделать расклад» (открывает приложение)\n"
+                             "• «Текст | https://ссылка» — своя кнопка-ссылка")
+
+    @dp.message(CastForm.button, is_admin)
+    async def adm_cast_button(message: Message, state: FSMContext) -> None:
+        t = (message.text or "").strip()
+        if t in ("", "-"):
+            await state.update_data(btn="🔮 Сделать расклад", url=None)
+        elif "|" in t and t.split("|", 1)[1].strip().startswith(("https://", "http://")):
+            b, u = (x.strip() for x in t.split("|", 1))
+            await state.update_data(btn=b[:40] or "Подробнее", url=u)
+        else:
+            await message.answer("Формат: «Текст кнопки | https://ссылка» или «-»")
+            return
+        d = await state.get_data()
+        await message.answer("Так увидят пользователи:")
+        await send_cast(message.chat.id, d)
+        n = db.execute("SELECT COUNT(*) FROM users WHERE blocked=0").fetchone()[0]
+        await message.answer(f"Отправить {n} пользователям?", reply_markup=kb([("✅ Отправить всем", "adm:castgo")], [("Отмена", "adm:menu")]))
+
+    @dp.callback_query(F.data == "adm:castgo", is_admin)
+    async def adm_cast_go(cb: CallbackQuery, state: FSMContext) -> None:
+        d = await state.get_data()
+        await state.clear()
+        if not d.get("text") and not d.get("photo"):
+            await cb.answer("Черновик рассылки потерян, начни заново", show_alert=True)
+            return
+        await edit(cb, "🚀 Рассылка запущена. Пришлю отчёт, когда закончу.", kb(BACK))
+        asyncio.create_task(run_cast(cb.from_user.id, d))
+
+    async def run_cast(admin_id: int, d: dict) -> None:
+        users = [r[0] for r in db.execute("SELECT id FROM users WHERE blocked=0").fetchall()]
+        ok = blocked = failed = 0
+        for uid in users:
+            for _ in range(2):
+                try:
+                    await send_cast(uid, d)
+                    ok += 1
+                    break
+                except TelegramRetryAfter as e:
+                    await asyncio.sleep(e.retry_after)
+                except TelegramForbiddenError:
+                    db.execute("UPDATE users SET blocked=1 WHERE id=?", (uid,))
+                    db.commit()
+                    blocked += 1
+                    break
+                except Exception as e:
+                    log.warning("cast %s: %s", uid, e)
+                    failed += 1
+                    break
+            await asyncio.sleep(0.05)
+        log.info("рассылка: доставлено %s, заблокировали %s, ошибки %s", ok, blocked, failed)
+        await bot.send_message(admin_id, f"📨 Рассылка завершена\n\n✅ Доставлено: {ok}\n🚫 Заблокировали бота: {blocked}\n⚠️ Ошибки: {failed}",
+                               reply_markup=kb(BACK))
+
+    # ── 🎟 промокоды ──
+    @dp.callback_query(F.data == "adm:promos", is_admin)
+    async def adm_promos(cb: CallbackQuery) -> None:
+        rows = db.execute("SELECT * FROM promos WHERE active=1 ORDER BY created DESC LIMIT 10").fetchall()
+        lines = ["🎟 Промокоды\n"]
+        for p in rows:
+            what = f"{p['amount']} дн. безлимита" if p["kind"] == "sub" else f"+{p['amount']} раскладов"
+            lim = f"{p['used']}/{p['max_uses']}" if p["max_uses"] else f"{p['used']}/∞"
+            exp = f", до {p['expires'][:10]}" if p["expires"] else ""
+            lines.append(f"• {p['code']} — {what}, использовано {lim}{exp}")
+        if not rows:
+            lines.append("Пока нет промокодов.")
+        lines.append(f"\nСсылка для активации: t.me/{BOT_USERNAME}?start=promo_КОД")
+        btns = [[("➕ Раскладов", "adm:pnew:credits"), ("➕ Дней безлимита", "adm:pnew:sub")]]
+        btns += [[(f"🗑 {p['code']}", f"adm:pdel:{p['code']}")] for p in rows]
+        btns.append(BACK)
+        await edit(cb, "\n".join(lines), kb(*btns))
+
+    @dp.callback_query(F.data.startswith("adm:pnew:"), is_admin)
+    async def adm_promo_new(cb: CallbackQuery, state: FSMContext) -> None:
+        await state.set_state(PromoForm.code)
+        await state.update_data(kind=cb.data.split(":")[2])
+        await edit(cb, "Шаг 1/3. Придумай код (латиница и цифры, например LUNA2026) или «-» — сгенерирую сам.\n\nОтмена: /cancel", kb())
+
+    @dp.message(PromoForm.code, is_admin)
+    async def adm_promo_code(message: Message, state: FSMContext) -> None:
+        code = (message.text or "").strip().upper()
+        if code == "-":
+            code = "ARKAN" + secrets.token_hex(2).upper()
+        if not code.isascii() or not code.replace("_", "").isalnum() or not 3 <= len(code) <= 32:
+            await message.answer("Только латиница, цифры и _, от 3 до 32 символов. Ещё раз или /cancel")
+            return
+        if db.execute("SELECT 1 FROM promos WHERE code=?", (code,)).fetchone():
+            await message.answer("Такой код уже есть. Придумай другой.")
+            return
+        await state.update_data(code=code)
+        await state.set_state(PromoForm.amount)
+        kind = (await state.get_data())["kind"]
+        await message.answer(f"Код: {code}\nШаг 2/3. " + ("Сколько дней безлимита дать?" if kind == "sub" else "Сколько раскладов начислить?"))
+
+    @dp.message(PromoForm.amount, is_admin)
+    async def adm_promo_amount(message: Message, state: FSMContext) -> None:
+        t = (message.text or "").strip()
+        if not t.isdigit() or not 1 <= int(t) <= 3650:
+            await message.answer("Нужно число от 1 до 3650")
+            return
+        await state.update_data(amount=int(t))
+        await state.set_state(PromoForm.limits)
+        await message.answer("Шаг 3/3. Ограничения: «сколько активаций дней_действия».\n"
+                             "Например «100 30» — 100 человек, 30 дней. «0 0» — без ограничений.")
+
+    @dp.message(PromoForm.limits, is_admin)
+    async def adm_promo_limits(message: Message, state: FSMContext) -> None:
+        parts = (message.text or "").split()
+        if len(parts) != 2 or not all(p.isdigit() for p in parts):
+            await message.answer("Два числа через пробел, например «100 30» или «0 0»")
+            return
+        uses, days = int(parts[0]), int(parts[1])
+        d = await state.get_data()
+        await state.clear()
+        expires = (utcnow() + dt.timedelta(days=days)).isoformat() if days else None
+        db.execute("INSERT INTO promos(code,kind,amount,max_uses,expires,created) VALUES(?,?,?,?,?,?)",
+                   (d["code"], d["kind"], d["amount"], uses or None, expires, utcnow().isoformat()))
+        db.commit()
+        what = f"{d['amount']} дн. безлимита" if d["kind"] == "sub" else f"+{d['amount']} раскладов"
+        await message.answer(f"✅ Промокод {d['code']} создан: {what}"
+                             f"{f', {uses} активаций' if uses else ''}{f', {days} дн.' if days else ''}.\n\n"
+                             f"Как активировать:\n• в приложении: Профиль → Промокод\n• в боте: /promo {d['code']}\n"
+                             f"• ссылкой: https://t.me/{BOT_USERNAME}?start=promo_{d['code']}", reply_markup=kb(BACK))
+
+    @dp.callback_query(F.data.startswith("adm:pdel:"), is_admin)
+    async def adm_promo_del(cb: CallbackQuery) -> None:
+        db.execute("UPDATE promos SET active=0 WHERE code=?", (cb.data.split(":", 2)[2],))
+        db.commit()
+        await cb.answer("Промокод отключён")
+        await adm_promos(cb)
+
+    @dp.message(Command("promo"))
+    async def cmd_promo(message: Message, command: CommandObject) -> None:
+        get_user(message.from_user.id, message.from_user.full_name)
+        if not command.args:
+            await message.answer("Напиши код так: /promo КОД")
+            return
+        ok, msg = apply_promo(message.from_user.id, command.args)
+        await message.answer(("✅ " if ok else "❌ ") + msg, reply_markup=app_kb() if ok else None)
+
     @dp.message(F.text, StateFilter(None))
     async def any_text(message: Message) -> None:
         await message.answer("Нажми кнопку, чтобы сделать расклад 👇", reply_markup=app_kb())
@@ -864,9 +1104,65 @@ async def h_me(request: web.Request) -> web.Response:
     u = auth(body)
     if "daily" in body:
         db.execute("UPDATE users SET daily=? WHERE id=?", (1 if body["daily"] else 0, u["id"]))
+    if "dailyHour" in body and str(body["dailyHour"]).isdigit() and 0 <= int(body["dailyHour"]) <= 23:
+        db.execute("UPDATE users SET daily_hour=? WHERE id=?", (int(body["dailyHour"]), u["id"]))
+    db.commit()
+    return web.json_response(profile(user_row(u["id"])))
+
+
+async def h_history(request: web.Request) -> web.Response:
+    u = auth(await request.json())
+    rows = db.execute("SELECT id, spread, cards, question, note, outcome, created FROM draws "
+                      "WHERE user_id=? ORDER BY id DESC LIMIT 40", (u["id"],)).fetchall()
+    return web.json_response({"items": [{**r, "cards": json.loads(r["cards"])} for r in rows]})
+
+
+async def h_note(request: web.Request) -> web.Response:
+    body = await request.json()
+    u = auth(body)
+    outcome = body.get("outcome") if body.get("outcome") in ("yes", "no", None) else None
+    cur = db.execute("UPDATE draws SET note=?, outcome=? WHERE id=? AND user_id=?",
+                     ((body.get("note") or "")[:1000] or None, outcome, int(body.get("id") or 0), u["id"]))
+    db.commit()
+    return web.json_response({"ok": cur.rowcount == 1})
+
+
+async def h_matrix(request: web.Request) -> web.Response:
+    """Матрица судьбы: личный аркан бесплатно, полная матрица — за 1 расклад (или по безлимиту), открывается навсегда."""
+    body = await request.json()
+    u = auth(body)
+    try:
+        d = matrix_mod.parse_date(str(body.get("date", "")))
+    except ValueError:
+        raise web.HTTPBadRequest(text="bad date")
+    key = d.isoformat()
+    unlocked = sub_active(u) or db.execute("SELECT 1 FROM matrix_unlocks WHERE user_id=? AND bdate=?",
+                                           (u["id"], key)).fetchone() is not None
+    if body.get("unlock") and not unlocked:
+        if not charge_premium(u["id"]):
+            return web.json_response({"error": "limit", "me": profile(user_row(u["id"]))}, status=402)
+        db.execute("INSERT INTO matrix_unlocks(user_id,bdate,created) VALUES(?,?,?) ON CONFLICT DO NOTHING",
+                   (u["id"], key, utcnow().isoformat()))
         db.commit()
-        u = user_row(u["id"])
-    return web.json_response(profile(u))
+        unlocked = True
+    return web.json_response({**matrix_mod.matrix(d, unlocked), "me": profile(user_row(u["id"]))})
+
+
+async def h_compat(request: web.Request) -> web.Response:
+    body = await request.json()
+    auth(body)
+    try:
+        d1, d2 = matrix_mod.parse_date(str(body.get("d1", ""))), matrix_mod.parse_date(str(body.get("d2", "")))
+    except ValueError:
+        raise web.HTTPBadRequest(text="bad date")
+    return web.json_response(matrix_mod.compatibility(d1, d2))
+
+
+async def h_promo(request: web.Request) -> web.Response:
+    body = await request.json()
+    u = auth(body)
+    ok, msg = apply_promo(u["id"], str(body.get("code", "")))
+    return web.json_response({"ok": ok, "message": msg, "me": profile(user_row(u["id"]))})
 
 
 async def h_draw(request: web.Request) -> web.Response:
@@ -894,13 +1190,14 @@ async def h_draw(request: web.Request) -> web.Response:
 
     rng = random.SystemRandom()
     cards = [[cid, 1 if rng.random() < 0.3 else 0] for cid in rng.sample(list(CARDS), n)]
-    db.execute("INSERT INTO draws(user_id,spread,cards,paid_by,created) VALUES(?,?,?,?,?)",
-               (uid, spread, json.dumps(cards), paid_by, utcnow().isoformat()))
+    draw_id = db.execute("INSERT INTO draws(user_id,spread,cards,paid_by,created,question) VALUES(?,?,?,?,?,?) RETURNING id",
+                         (uid, spread, json.dumps(cards), paid_by, utcnow().isoformat(),
+                          str(body.get("question") or "")[:300] or None)).fetchone()["id"]
     ad = None if paid_by == "sub" else active_ad()  # подписчикам «Безлимита» реклама не показывается
     if ad:
         db.execute("UPDATE ads SET views=views+1 WHERE id=?", (ad["id"],))
     db.commit()
-    return web.json_response({"cards": cards, "paidBy": paid_by, "me": profile(user_row(uid)),
+    return web.json_response({"id": draw_id, "cards": cards, "paidBy": paid_by, "me": profile(user_row(uid)),
                               "ad": ad_public(ad) if ad else None})
 
 
@@ -973,21 +1270,28 @@ DAILY_TEXT = [
 
 
 async def daily_loop(app: web.Application) -> None:
+    """Раз в минуту: кому уже наступил «свой» час (по умолчанию DAILY_HOUR) и кто сегодня ещё не получал карту."""
+    # переход со старой схемы (одна общая метка дня): кто уже получил карту сегодня — не получит повторно
+    db.execute("UPDATE users SET daily_last=(SELECT v FROM meta WHERE k='daily_sent') WHERE daily_last IS NULL")
+    db.commit()
     while True:
         try:
             t = dt.datetime.now(TZ)
-            last = db.execute("SELECT v FROM meta WHERE k='daily_sent'").fetchone()
-            if t.hour >= DAILY_HOUR and (not last or last[0] != today()):
-                db.execute("INSERT INTO meta(k,v) VALUES('daily_sent', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (today(),))
+            day = t.date().isoformat()
+            users = [r[0] for r in db.execute(
+                "SELECT id FROM users WHERE daily=1 AND blocked=0 AND COALESCE(daily_hour, ?) <= ? "
+                "AND (daily_last IS NULL OR daily_last <> ?)", (DAILY_HOUR, t.hour, day)).fetchall()]
+            if users:
+                for uid in users:  # сначала помечаем — даже при перезапуске никто не получит карту дважды
+                    db.execute("UPDATE users SET daily_last=? WHERE id=?", (day, uid))
                 db.commit()
-                await send_daily(app)
+                await send_daily(app, users)
         except Exception:
             log.exception("daily loop")
         await asyncio.sleep(60)
 
 
-async def send_daily(app: web.Application) -> None:
-    users = [r[0] for r in db.execute("SELECT id FROM users WHERE daily=1 AND blocked=0")]
+async def send_daily(app: web.Application, users: list[int]) -> None:
     log.info("Карта дня: рассылка %d пользователям", len(users))
     kb = app_kb("🔮 Сделать расклад")
     for uid in users:
@@ -1026,6 +1330,13 @@ async def on_startup(app: web.Application) -> None:
     if bot:
         me = await bot.get_me()
         BOT_USERNAME = me.username
+        if BOT_MODE != "webhook":
+            # проверка ДО любых изменений бота: локальный запуск не должен трогать боевого бота на сервере
+            hook = (await bot.get_webhook_info()).url
+            if hook and "--force-polling" not in sys.argv:
+                raise SystemExit(f"Бот уже работает на сервере ({hook}). Локальный запуск снял бы вебхук и сломал "
+                                 "боевого бота. Для локальных тестов создай отдельного тестового бота, "
+                                 "или запусти с --force-polling, если точно нужно.")
         await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="🔮 Расклад", web_app=WebAppInfo(url=WEBAPP_URL)))
         if BOT_MODE == "webhook":
             # Render будит уснувший сервер входящим запросом — поэтому вебхук, а не polling
@@ -1056,6 +1367,11 @@ def make_app() -> web.Application:
     app.router.add_post("/api/invoice", h_invoice)
     app.router.add_post("/api/share", h_share)
     app.router.add_post("/api/ad_click", h_ad_click)
+    app.router.add_post("/api/history", h_history)
+    app.router.add_post("/api/note", h_note)
+    app.router.add_post("/api/matrix", h_matrix)
+    app.router.add_post("/api/compat", h_compat)
+    app.router.add_post("/api/promo", h_promo)
     app.router.add_get("/ads/{aid:\\d+}.jpg", h_ad_image)
     app.router.add_get("/health", h_health)
     app.router.add_static("/shares/", SHARES)

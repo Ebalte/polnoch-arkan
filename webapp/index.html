@@ -30,17 +30,143 @@
   .chip { background: var(--bg2); border: 1px solid #ffffff14; border-radius: 20px; padding: 5px 11px; font-size: 13px; color: var(--hint); cursor: pointer; }
   .chip b { color: var(--accent); }
 
-  .spreads { display: grid; gap: 8px; }
-  .spread {
-    background: var(--bg2); border: 1px solid #ffffff12; border-radius: var(--radius);
-    padding: 12px 14px; display: flex; gap: 12px; align-items: center; cursor: pointer; transition: transform .15s;
+  /* главная: карта дня */
+  .hero {
+    position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; cursor: pointer;
+    background: radial-gradient(circle at 15% 50%, #5b3fb0 0%, transparent 55%), linear-gradient(135deg, #2b1d52, #1a1430);
+    border: 1px solid #d4af3766; border-radius: 18px; padding: 16px; margin-bottom: 22px; transition: transform .15s;
   }
-  .spread:active { transform: scale(.98); }
-  .spread.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-  .spread .ico { font-size: 26px; width: 36px; text-align: center; flex: none; }
+  .hero:active { transform: scale(.98); }
+  .hero::after { content: "✦ ✧ ✦"; position: absolute; right: 14px; top: 10px; color: #d4af3755; font-size: 12px; letter-spacing: 4px; }
+  .hero-cards { position: relative; width: 70px; height: 92px; flex: none; }
+  .hc { position: absolute; width: 52px; height: 84px; border-radius: 7px; background: var(--card-back); border: 1.5px solid var(--accent); box-shadow: 0 4px 12px #0007; }
+  .hc::after { content: "✦"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); font-size: 16px; }
+  .hc:nth-child(1) { left: 0; top: 6px; transform: rotate(-12deg); }
+  .hc:nth-child(2) { left: 9px; top: 3px; transform: rotate(-3deg); }
+  .hc:nth-child(3) { left: 18px; top: 2px; transform: rotate(8deg); animation: float 3s ease-in-out infinite; }
+  @keyframes float { 50% { transform: rotate(8deg) translateY(-4px); } }
+  .hero-txt small { display: block; color: var(--hint); font-size: 12px; }
+  .hero-txt small::first-letter { text-transform: uppercase; }
+  .hero-txt b { display: block; font-size: 20px; margin: 2px 0 3px; }
+  .hero-txt span { color: var(--hint); font-size: 13px; line-height: 1.3; display: block; }
+  .hero-badge { position: absolute; right: 12px; bottom: 10px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 10px; background: #7ee0a133; color: #7ee0a1; }
+  .hero-badge:empty { display: none; }
+
+  /* главная: темы */
+  .section-title { font-size: 13px; color: var(--hint); text-transform: uppercase; letter-spacing: 1px; margin: 0 2px 10px; }
+  .cats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cat {
+    position: relative; overflow: hidden; border-radius: 16px; padding: 14px 12px 12px; min-height: 128px; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid #ffffff14; transition: transform .15s;
+  }
+  .cat:active { transform: scale(.97); }
+  .cat .ci { position: absolute; top: 10px; left: 12px; font-size: 30px; filter: drop-shadow(0 2px 6px #0008); }
+  .cat .glyph { position: absolute; right: -8px; top: -14px; font-size: 72px; opacity: .12; }
+  .cat b { font-size: 16px; line-height: 1.15; }
+  .cat small { color: #ffffffa8; font-size: 12px; margin-top: 3px; }
+  .cat .cnt { position: absolute; top: 12px; right: 10px; font-size: 11px; padding: 2px 7px; border-radius: 9px; background: #0005; color: #fffc; }
+  .cat.quick { background: linear-gradient(150deg, #3f2a7a, #241947); }
+  .cat.love { background: linear-gradient(150deg, #7a2a5a, #3a1834); }
+  .cat.work { background: linear-gradient(150deg, #1f5a52, #142f33); }
+  .cat.fate { background: linear-gradient(150deg, #6a4a14, #2d2010); }
+
+  .matrix-tile { margin-top: 10px; min-height: 104px; background: linear-gradient(120deg, #1d3a6e, #4a2a7a 60%, #6a2a5a); }
+  .matrix-tile small { max-width: 85%; }
+
+  /* луна */
+  .moon { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid #ffffff12; border-radius: 14px; padding: 10px 12px; margin: -10px 0 20px; font-size: 13px; color: var(--hint); }
+  .moon .mi { font-size: 26px; }
+  .moon b { color: var(--text); display: block; font-size: 14px; }
+  .moon.special { cursor: pointer; border-color: #d4af3799; background: linear-gradient(120deg, #2b2450, #3a2a10); }
+  .moon .go { margin-left: auto; color: var(--accent); font-weight: 600; white-space: nowrap; }
+
+  /* веер */
+  .picked { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 70px; margin: 6px 0 4px; }
+  .pslot { width: 58px; height: 92px; border-radius: 7px; border: 1.5px dashed #d4af3766; display: grid; place-items: center; font-size: 9px; color: var(--hint); text-align: center; line-height: 1.15; padding: 2px; transition: all .3s; letter-spacing: -.2px; }
+  .picked.many .pslot { width: 34px; height: 54px; }
+  .pslot.full { border: 1.5px solid var(--accent); background: var(--card-back); color: var(--accent); font-size: 18px; box-shadow: 0 0 14px #d4af3766; animation: pop .35s ease; }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+  .fan { position: relative; height: 270px; margin: 6px auto 0; max-width: 420px; overflow: hidden; }
+  .fc { position: absolute; left: 50%; bottom: 46px; width: 62px; height: 100px; margin-left: -31px; border-radius: 8px; cursor: pointer;
+        background: var(--card-back); border: 1.5px solid var(--accent); box-shadow: -2px 3px 10px #0008;
+        transform-origin: 50% 300%; transition: transform .35s ease, opacity .35s ease; }
+  .fc::after { content: "✦"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); font-size: 18px; }
+  .fc.taken { opacity: 0; pointer-events: none; }
+  .fan.dealing .fc { transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+
+  /* матрица */
+  .inp { width: 100%; background: var(--bg2); color: var(--text); border: 1px solid #ffffff1a; border-radius: var(--radius); padding: 12px; font: inherit; font-size: 16px; color-scheme: dark; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; }
+  .seg button { text-align: center; }
+  .arc { display: flex; gap: 14px; align-items: flex-start; background: var(--bg2); border-radius: var(--radius); padding: 14px; margin-top: 12px; animation: fade .4s ease both; }
+  .arc .mini { width: 70px; flex: none; }
+  .arc .t { font-size: 12px; color: var(--hint); text-transform: uppercase; letter-spacing: .5px; }
+  .arc h3 { margin: 3px 0 6px; font-size: 17px; }
+  .arc h3 span { color: var(--accent); }
+  .arc p { margin: 0; line-height: 1.45; font-size: 14px; }
+  .arc p + p { margin-top: 6px; color: var(--hint); }
+  .arc.hero-arc { background: linear-gradient(135deg, #2b1d52, #3a2470); border: 1px solid #d4af3755; }
+  .arc.hero-arc .mini { width: 92px; }
+  .locked { position: relative; background: var(--bg2); border-radius: var(--radius); padding: 14px; margin-top: 12px; overflow: hidden; }
+  .locked .row2 { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #ffffff0d; filter: blur(.4px); color: var(--hint); }
+  .locked .row2 span:last-child { filter: blur(4px); color: var(--text); }
+  .ring { width: 150px; height: 150px; border-radius: 50%; margin: 16px auto 6px; display: grid; place-items: center; }
+  .ring div { width: 118px; height: 118px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; text-align: center; }
+  .ring b { font-size: 34px; color: var(--accent); display: block; }
+  .ring small { color: var(--hint); font-size: 12px; }
+  .pairline { display: flex; justify-content: center; gap: 10px; align-items: center; margin: 10px 0; font-size: 14px; }
+  .pairline .mini { width: 54px; }
+
+  /* заметки к раскладу */
+  .notes { background: var(--bg2); border-radius: var(--radius); padding: 14px; }
+  .notes .t { font-size: 12px; color: var(--hint); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .notes textarea { height: 64px; background: var(--bg3); }
+  .oc { display: flex; gap: 8px; margin-top: 8px; }
+  .oc button { flex: 1; background: var(--bg3); color: var(--text); border: 1px solid #ffffff1a; border-radius: 12px; padding: 10px; font-size: 14px; cursor: pointer; }
+  .oc button.on.yes { background: #7ee0a133; border-color: #7ee0a1; }
+  .oc button.on.no { background: #ff8fa333; border-color: var(--danger); }
+  .saved { font-size: 12px; color: #7ee0a1; margin-top: 6px; min-height: 15px; }
+
+  /* квиз */
+  .quiz-card { width: 120px; margin: 4px auto 10px; aspect-ratio: .58; position: relative; }
+  .quiz-card .face.front { transform: none; }
+  .qopts { display: grid; gap: 8px; margin-top: 10px; }
+  .qopt { background: var(--bg3); color: var(--text); border: 1px solid #ffffff1a; border-radius: 12px; padding: 12px; font-size: 15px; cursor: pointer; text-align: left; }
+  .qopt.right { background: #7ee0a133; border-color: #7ee0a1; }
+  .qopt.wrong { background: #ff8fa333; border-color: var(--danger); }
+  .qscore { display: flex; justify-content: space-between; font-size: 13px; color: var(--hint); }
+  .kwq { text-align: center; font-size: 16px; color: var(--accent); background: var(--bg3); border-radius: 12px; padding: 18px 12px; margin: 6px 0; line-height: 1.4; }
+  select.inp { padding: 8px 10px; width: auto; font-size: 14px; }
+
+  /* выбор расклада */
+  .back { background: none; border: 0; color: var(--accent); font-size: 15px; padding: 4px 0; cursor: pointer; margin-bottom: 2px; }
+  .spreads { display: grid; gap: 10px; }
+  .spread {
+    background: var(--bg2); border: 1px solid #ffffff12; border-radius: 16px;
+    padding: 12px 14px; display: flex; gap: 14px; align-items: center; cursor: pointer; transition: transform .15s, border-color .15s;
+  }
+  .spread:active { transform: scale(.98); border-color: var(--accent); }
+  .spread .info { flex: 1; min-width: 0; }
   .spread b { display: block; font-size: 15px; }
-  .spread small { color: var(--hint); font-size: 13px; }
-  .spread .lock { margin-left: auto; font-size: 12px; color: var(--accent); white-space: nowrap; }
+  .spread small { display: block; color: var(--hint); font-size: 13px; margin-top: 2px; line-height: 1.3; }
+  .spread .meta { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 9px; background: var(--bg3); color: var(--hint); white-space: nowrap; }
+  .tag.free { background: #7ee0a126; color: #7ee0a1; }
+  .tag.pay { background: #d4af3726; color: var(--accent); }
+  .tag.sub { background: #8a5cf633; color: #c4a8ff; }
+
+  /* мини-схема расклада */
+  .layout { position: relative; width: 64px; height: 64px; flex: none; }
+  .layout i { position: absolute; border-radius: 2px; background: var(--card-back); border: 1px solid var(--accent); box-shadow: 0 1px 3px #0006; }
+  .big-layout { width: 150px; height: 110px; margin: 4px auto 6px; }
+  .big-layout i { border-radius: 4px; border-width: 1.5px; }
+
+  /* вопрос */
+  .ask-head { text-align: center; }
+  .ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .idea { background: var(--bg2); border: 1px solid #ffffff1c; color: var(--text); border-radius: 16px; padding: 7px 11px; font-size: 13px; cursor: pointer; }
+  .idea:active { border-color: var(--accent); }
+  .cost { font-size: 13px; margin-top: 8px; }
 
   label.q { display: block; margin: 16px 0 6px; color: var(--hint); font-size: 14px; }
   textarea {
@@ -164,10 +290,72 @@
   <div class="topbar"><div class="chip" id="creditChip" style="display:none"></div><div class="chip" id="soundChip">🔊</div></div>
   <h1>🌙 <span>Полночный Аркан</span></h1>
   <div class="sub">Таро · задай вопрос — карты ответят</div>
+  <div class="hero" id="dayHero">
+    <div class="hero-cards"><div class="hc"></div><div class="hc"></div><div class="hc"></div></div>
+    <div class="hero-txt"><small id="heroDate"></small><b>Карта дня</b><span>Совет карт на сегодня — одним касанием</span></div>
+    <div class="hero-badge" id="heroBadge"></div>
+  </div>
+  <div class="moon" id="moonBar"></div>
+  <div class="section-title">Выбери тему</div>
+  <div class="cats" id="cats"></div>
+  <div class="cat matrix-tile" id="matrixTile">
+    <div class="glyph">✺</div><div class="ci">✨</div><div class="cnt">по дате рождения</div>
+    <b>Матрица судьбы и совместимость</b><small>Твой аркан, предназначение, деньги, любовь — и совместимость пары</small>
+  </div>
+</section>
+
+<!-- ВЕЕР: вытянуть карты самому -->
+<section id="fan" class="screen">
+  <h1 id="fanTitle"></h1>
+  <div class="sub" id="fanSub">Сосредоточься на вопросе и выбирай сердцем</div>
+  <div class="picked" id="picked"></div>
+  <div class="fan" id="fanDeck"></div>
+  <button class="btn ghost" id="autoPick">✦ Пусть карты выберут сами</button>
+</section>
+
+<!-- МАТРИЦА СУДЬБЫ -->
+<section id="matrix" class="screen">
+  <button class="back" data-back="home">‹ Назад</button>
+  <h1>✨ Матрица судьбы</h1>
+  <div class="sub">Нумерология арканов по дате рождения</div>
+  <div class="tabs seg" id="mxTabs"><button data-t="mine" class="active">Моя матрица</button><button data-t="pair">💞 Совместимость</button></div>
+  <div id="mxMine">
+    <label class="q" for="mxDate">Дата рождения</label>
+    <input type="date" class="inp" id="mxDate" min="1900-01-01">
+    <button class="btn" id="mxGo">Рассчитать матрицу</button>
+    <div id="mxRes"></div>
+  </div>
+  <div id="mxPair" style="display:none">
+    <label class="q" for="cpD1">Твоя дата рождения</label>
+    <input type="date" class="inp" id="cpD1" min="1900-01-01">
+    <label class="q" for="cpD2">Дата рождения партнёра</label>
+    <input type="date" class="inp" id="cpD2" min="1900-01-01">
+    <button class="btn" id="cpGo">Проверить совместимость</button>
+    <div id="cpRes"></div>
+  </div>
+</section>
+
+<!-- ВЫБОР РАСКЛАДА В ТЕМЕ -->
+<section id="pick" class="screen">
+  <button class="back" data-back="home">‹ Темы</button>
+  <h1 id="pickTitle"></h1>
+  <div class="sub" id="pickSub"></div>
   <div class="spreads" id="spreads"></div>
-  <label class="q" for="question">Твой вопрос (необязательно)</label>
-  <textarea id="question" maxlength="300" placeholder="Например: что меня ждёт в отношениях?"></textarea>
-  <button class="btn" id="startBtn">Перемешать колоду</button>
+</section>
+
+<!-- ВОПРОС -->
+<section id="ask" class="screen">
+  <button class="back" data-back="pick">‹ Расклады</button>
+  <div class="ask-head">
+    <div class="layout big-layout" id="askLayout"></div>
+    <h1 id="askTitle"></h1>
+    <div class="sub" id="askSub"></div>
+  </div>
+  <label class="q" for="question">Твой вопрос <span style="opacity:.6">(можно без него)</span></label>
+  <textarea id="question" maxlength="300" placeholder="Сформулируй, что тебя волнует…"></textarea>
+  <div class="ideas" id="ideas"></div>
+  <button class="btn" id="startBtn">✦ Перемешать колоду</button>
+  <div class="center cost" id="askCost"></div>
 </section>
 
 <!-- ТАСОВКА -->
@@ -194,6 +382,7 @@
 <section id="deckView" class="screen">
   <h1>Колода</h1>
   <div class="sub">78 карт Райдера–Уэйта · нажми, чтобы узнать значение</div>
+  <button class="btn gold" id="quizBtn" style="margin:0 0 14px">🎓 Учи Таро — проверь себя</button>
   <div class="tabs" id="deckTabs"></div>
   <div class="grid" id="deckGrid"></div>
 </section>
@@ -333,7 +522,31 @@ const SPREADS = [
   { id:"work", ico:"💼", name:"Работа и деньги", desc:"Положение, препятствие, возможность, совет", pos:["Текущее положение","Препятствие","Возможность","Совет"], premium:true },
   { id:"sit", ico:"🧭", name:"Ситуация", desc:"Суть, препятствие, совет, итог", pos:["Суть","Препятствие","Совет","Итог"], premium:true },
   { id:"week", ico:"📅", name:"Совет на неделю", desc:"По карте на каждый день", pos:["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"], premium:true },
-  { id:"celtic", ico:"✝️", name:"Кельтский крест", desc:"Самый подробный расклад на 10 карт", pos:["Суть ситуации","Препятствие","Основа","Прошлое","Цель","Ближайшее будущее","Ты сам(а)","Окружение","Надежды и страхи","Итог"], premium:true }
+  { id:"celtic", ico:"✝️", name:"Кельтский крест", desc:"Самый подробный расклад на 10 карт", pos:["Суть ситуации","Препятствие","Основа","Прошлое","Цель","Ближайшее будущее","Ты сам(а)","Окружение","Надежды и страхи","Итог"], premium:true },
+  { id:"fullmoon", ico:"🌕", name:"Расклад полнолуния", desc:"Время отпускать лишнее и видеть правду", pos:["Что отпустить","Что проявляется","Совет Луны"] },
+  { id:"newmoon", ico:"🌑", name:"Расклад новолуния", desc:"Время загадывать и начинать", pos:["Моё намерение","Ресурс","Первый шаг"] }
+];
+/* схема раскладки карт: [x, y, повёрнута?] в условных клетках */
+const LAYOUTS = {
+  day: [[0,0]], yesno: [[0,0]],
+  three: [[0,0],[1,0],[2,0]], thinks: [[0,0],[1,0],[2,0]],
+  love: [[0,0],[2,0],[1,1]],
+  work: [[0,0],[1,0],[0,1],[1,1]],
+  sit: [[1,0],[0,1],[2,1],[1,2]],
+  week: [[0,0],[1,0],[2,0],[3,0],[0.5,1.2],[1.5,1.2],[2.5,1.2]],
+  celtic: [[1,1],[1,1,1],[1,2],[0,1],[1,0],[2,1],[3.4,3],[3.4,2],[3.4,1],[3.4,0]],
+  fullmoon: [[0,1],[1,0],[2,1]], newmoon: [[0,0],[2,0],[1,1]]
+};
+const MOON_IDEAS = ["Что мне пора отпустить?","Что сейчас станет явным?","Какое желание загадать?","С чего начать новый цикл?"];
+const CATS = [
+  { id:"quick", ico:"⚡", glyph:"☾", name:"Быстрый ответ", desc:"Да или нет, прошлое и будущее", spreads:["yesno","three"],
+    ideas:["Стоит ли это делать?","Что меня ждёт?","Правильный ли это выбор?","Чем закончится ситуация?"] },
+  { id:"love", ico:"💞", glyph:"♡", name:"Любовь", desc:"Отношения и чувства", spreads:["love","thinks"],
+    ideas:["Что он(а) чувствует ко мне?","Есть ли у нас будущее?","Вернётся ли он(а)?","Как наладить отношения?"] },
+  { id:"work", ico:"💼", glyph:"◈", name:"Работа и деньги", desc:"Карьера, доход, решения", spreads:["work","sit"],
+    ideas:["Стоит ли менять работу?","Получу ли я эту должность?","Как увеличить доход?","Удастся ли мой проект?"] },
+  { id:"fate", ico:"🔮", glyph:"✶", name:"Судьба", desc:"Неделя вперёд и глубокий расклад", spreads:["week","celtic"],
+    ideas:["Что меня ждёт на этой неделе?","Куда мне двигаться дальше?","В чём мой урок сейчас?","Что мне нужно понять?"] }
 ];
 const YES_CARDS = ["m1","m3","m4","m6","m7","m8","m10","m11","m17","m19","m20","m21"];
 const NO_CARDS  = ["m12","m13","m15","m16","m18"];
@@ -372,7 +585,9 @@ function setMe(me) {
   const chip = $("#creditChip");
   chip.style.display = ME ? "" : "none";
   if (ME) chip.innerHTML = ME.sub ? "👑 <b>Безлимит</b>" : `🆓 <b>${ME.freeLeft}</b> · 🔮 <b>${ME.credits}</b>`;
-  renderSpreads();
+  renderHome();
+  if ($("#pick").classList.contains("active")) renderPick();
+  if ($("#ask").classList.contains("active")) renderAsk();
 }
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day:"numeric", month:"long" });
 
@@ -407,7 +622,9 @@ function updateSoundChip() { $("#soundChip").textContent = soundOn ? "🔊" : "�
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 let selectedSpread = SPREADS[0];
+let selectedCat = CATS[0];
 let current = null;
+const spreadById = Object.fromEntries(SPREADS.map(s => [s.id, s]));
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 function show(id) {
@@ -417,30 +634,91 @@ function show(id) {
   window.scrollTo(0, 0);
   if (id === "history") renderHistory();
   if (id === "profile") renderProfile();
-  if (tg && tg.BackButton) (id === "result" ? tg.BackButton.show() : tg.BackButton.hide());
+  if (tg && tg.BackButton) (["pick", "ask", "result", "fan", "matrix"].includes(id) ? tg.BackButton.show() : tg.BackButton.hide());
 }
+const BACK_OF = { pick: "home", ask: "pick", result: "home", fan: "home", matrix: "home" };
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { haptic(); show(b.dataset.go); });
-if (tg && tg.BackButton) tg.BackButton.onClick(() => show("home"));
+document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => { haptic(); show(b.dataset.back); });
+if (tg && tg.BackButton) tg.BackButton.onClick(() => {
+  const cur = document.querySelector(".screen.active").id;
+  show(BACK_OF[cur] || "home");
+});
 $("#soundChip").onclick = () => { soundOn = !soundOn; lset("sound", soundOn ? "1" : "0"); updateSoundChip(); if (soundOn) sfx.flip(); };
 $("#creditChip").onclick = () => show("profile");
 updateSoundChip();
 
-function spreadBadge(s) {
-  if (!ME) return s.premium ? '<div class="lock">🔒</div>' : "";
-  if (ME.sub) return "";
-  if (s.premium) return '<div class="lock">🔮 1 расклад</div>';
-  return ME.freeLeft > 0 ? '<div class="lock" style="color:#7ee0a1">бесплатно</div>' : '<div class="lock">🔮 1 расклад</div>';
+/* цена расклада для текущего пользователя */
+function priceTag(s) {
+  if (!ME) return s.premium ? '<span class="tag pay">🔒 в боте</span>' : '<span class="tag free">бесплатно</span>';
+  if (ME.sub) return '<span class="tag sub">👑 безлимит</span>';
+  if (!s.premium && ME.freeLeft > 0) return `<span class="tag free">бесплатно · ещё ${ME.freeLeft}</span>`;
+  return '<span class="tag pay">🔮 1 расклад</span>';
 }
-function renderSpreads() {
-  $("#spreads").innerHTML = SPREADS.map(s =>
-    `<div class="spread${s.id === selectedSpread.id ? " selected" : ""}" data-id="${s.id}">
-       <div class="ico">${s.ico}</div><div><b>${s.name}</b><small>${s.desc}</small></div>
-       ${spreadBadge(s)}</div>`).join("");
-  document.querySelectorAll(".spread").forEach(el => el.onclick = () => {
+function cardsWord(n) { return n === 1 ? "карта" : n < 5 ? "карты" : "карт"; }
+
+/* мини-схема: карточки, расставленные как в настоящем раскладе */
+function layoutHtml(id, box) {
+  const pts = LAYOUTS[id];
+  const maxX = Math.max(...pts.map(p => p[0])) + 1, maxY = Math.max(...pts.map(p => p[1])) + 1;
+  const unit = Math.min(box.w / (maxX * 0.82), box.h / maxY);
+  const cw = unit * 0.62, ch = unit * 0.92;
+  const offX = (box.w - (maxX - 1) * unit * 0.82 - cw) / 2, offY = (box.h - (maxY - 1) * unit - ch) / 2;
+  return pts.map(([x, y, rot], i) => `<i style="left:${offX + x * unit * 0.82}px;top:${offY + y * unit}px;width:${cw}px;height:${ch}px;` +
+    `${rot ? "transform:rotate(90deg);opacity:.9;" : ""}animation:fade .3s ${i * 40}ms both"></i>`).join("");
+}
+
+function renderHome() {
+  $("#heroDate").textContent = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+  $("#heroBadge").textContent = !ME ? "бесплатно" : ME.sub ? "" : ME.freeLeft > 0 ? `бесплатно · ещё ${ME.freeLeft}` : "";
+  $("#cats").innerHTML = CATS.map(c => `<div class="cat ${c.id}" data-cat="${c.id}">
+      <div class="glyph">${c.glyph}</div><div class="ci">${c.ico}</div><div class="cnt">${c.spreads.length} расклада</div>
+      <b>${c.name}</b><small>${c.desc}</small></div>`).join("");
+  renderMoon();
+  document.querySelectorAll("#cats .cat").forEach(el => el.onclick = () => {
     haptic();
-    selectedSpread = SPREADS.find(s => s.id === el.dataset.id);
-    document.querySelectorAll(".spread").forEach(x => x.classList.toggle("selected", x === el));
+    selectedCat = CATS.find(c => c.id === el.dataset.cat);
+    renderPick();
+    show("pick");
   });
+}
+$("#matrixTile").onclick = () => { haptic(); openMatrix(); };
+$("#dayHero").onclick = () => { haptic("medium"); selectedSpread = spreadById.day; startSpread(spreadById.day, ""); };
+
+function renderPick() {
+  const c = selectedCat;
+  $("#pickTitle").textContent = c.ico + " " + c.name;
+  $("#pickSub").textContent = "Выбери расклад";
+  $("#spreads").innerHTML = c.spreads.map(id => spreadById[id]).map(s => `
+    <div class="spread" data-id="${s.id}">
+      <div class="layout">${layoutHtml(s.id, { w: 64, h: 64 })}</div>
+      <div class="info"><b>${s.name}</b><small>${s.desc}</small>
+        <div class="meta"><span class="tag">${s.pos.length} ${cardsWord(s.pos.length)}</span>${priceTag(s)}</div></div>
+    </div>`).join("");
+  document.querySelectorAll("#spreads .spread").forEach(el => el.onclick = () => {
+    haptic();
+    selectedSpread = spreadById[el.dataset.id];
+    $("#question").value = "";
+    openAsk("pick");
+  });
+}
+
+function openAsk(from) {
+  BACK_OF.ask = from;
+  const b = $("#ask .back"); b.dataset.back = from; b.textContent = from === "pick" ? "‹ Расклады" : "‹ Назад";
+  renderAsk();
+  show("ask");
+}
+function renderAsk() {
+  const s = selectedSpread;
+  $("#askLayout").innerHTML = layoutHtml(s.id, { w: 150, h: 110 });
+  $("#askTitle").textContent = s.name;
+  $("#askSub").textContent = s.pos.length <= 4 ? s.pos.join(" · ") : `${s.desc} · ${s.pos.length} карт`;
+  const ideas = ["fullmoon", "newmoon"].includes(s.id) ? MOON_IDEAS : selectedCat.ideas;
+  $("#ideas").innerHTML = ideas.map(t => `<button class="idea">${esc(t)}</button>`).join("");
+  document.querySelectorAll(".idea").forEach(b => b.onclick = () => { haptic(); $("#question").value = b.textContent; });
+  const free = ME && !ME.sub && !s.premium && ME.freeLeft > 0;
+  $("#askCost").textContent = !ME ? "" : ME.sub ? "👑 Безлимит — бесплатно" : free ? `Бесплатно · осталось сегодня: ${ME.freeLeft}`
+    : `Спишется 1 расклад · на балансе: ${ME.credits}`;
 }
 
 function cardFace(card, reversed) {
@@ -458,18 +736,20 @@ function draw(n) {
   return out;
 }
 
-$("#startBtn").onclick = async () => {
-  const sp = selectedSpread;
+$("#startBtn").onclick = () => startSpread(selectedSpread, $("#question").value.trim());
+$("#againBtn").onclick = () => { haptic(); $("#question").value = ""; show("home"); };
+
+async function startSpread(sp, q) {
   if (!ME && sp.premium) return toast("Этот расклад доступен при запуске через бота");
   const btn = $("#startBtn"); btn.disabled = true;
   haptic("medium"); ctx();
-  const q = $("#question").value.trim();
-  let cards, ad = null;
+  let cards, ad = null, drawId = null;
   if (ME) {
     try {
-      const d = await api("draw", { spread: sp.id });
+      const d = await api("draw", { spread: sp.id, question: q });
       setMe(d.me);
       ad = d.ad;
+      drawId = d.id;
       cards = d.cards.map(([id, rv]) => ({ card: byId[id], reversed: !!rv }));
       if (d.paidBy === "credit") toast(`Списан 1 расклад · осталось ${d.me.credits}`);
     } catch (e) {
@@ -482,12 +762,51 @@ $("#startBtn").onclick = async () => {
   show("shuffle");
   setTimeout(() => {
     btn.disabled = false;
-    current = { spread: sp, question: q, cards, date: Date.now(), ad };
-    renderResult(current, false);
-    show("result");
-    haptic("ok");
-  }, 1700);
-};
+    current = { spread: sp, question: q, cards, date: Date.now(), ad, id: drawId };
+    runFan(sp, () => {
+      renderResult(current, false);
+      show("result");
+      haptic("ok");
+    });
+  }, 1300);
+}
+
+/* ================== ВЕЕР: вытянуть карты самому ================== */
+function runFan(sp, done) {
+  const n = sp.pos.length, total = 22;
+  let got = 0, finished = false;
+  $("#fanTitle").textContent = n === 1 ? "Вытяни свою карту" : `Вытяни ${n} ${cardsWord(n)}`;
+  $("#fanSub").textContent = "Сосредоточься на вопросе и выбирай сердцем";
+  $("#picked").className = "picked" + (n > 4 ? " many" : "");
+  $("#picked").innerHTML = sp.pos.map(p => `<div class="pslot">${n <= 4 ? esc(p) : ""}</div>`).join("");
+  const deck = $("#fanDeck");
+  const spreadDeg = Math.min(64, (Math.min(window.innerWidth, 420) - 40) / 6), r = (i) => -spreadDeg / 2 + spreadDeg * i / (total - 1);
+  deck.className = "fan dealing";
+  deck.innerHTML = Array.from({ length: total }, (_, i) =>
+    `<div class="fc" data-i="${i}" style="transform: rotate(0deg) translateY(30px); z-index:${i}"></div>`).join("");
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    deck.querySelectorAll(".fc").forEach((el, i) => { el.style.transform = `rotate(${r(i)}deg)`; });
+  }));
+  setTimeout(() => deck.classList.remove("dealing"), 650);
+  const take = (el) => {
+    if (finished || el.classList.contains("taken")) return;
+    const i = +el.dataset.i;
+    el.style.transform = `rotate(${r(i)}deg) translateY(-160px) scale(.7)`;
+    el.classList.add("taken");
+    haptic("medium"); sfx.flip();
+    const slot = $("#picked").children[got];
+    slot.classList.add("full"); slot.textContent = "✦";
+    got++;
+    $("#fanSub").textContent = got < n ? `Осталось вытянуть: ${n - got}` : "Карты выбраны ✨";
+    if (got === n) { finished = true; setTimeout(done, 700); }
+  };
+  deck.querySelectorAll(".fc").forEach(el => el.onclick = () => take(el));
+  $("#autoPick").onclick = () => {
+    const left = [...deck.querySelectorAll(".fc:not(.taken)")].sort(() => Math.random() - .5).slice(0, n - got);
+    left.forEach((el, k) => setTimeout(() => take(el), k * 220));
+  };
+  show("fan");
+}
 
 function renderResult(r, openAll) {
   $("#resTitle").textContent = r.spread.ico + " " + r.spread.name;
@@ -561,9 +880,34 @@ async function finish(r, save) {
     : `<div class="t">Общий смысл</div><p>${summaryText(r)}</p>`;
   $("#reading").appendChild(div);
   sfx.chime();
+  if (r.id && ME) $("#reading").appendChild(notesBlock(r));
   if (r.ad) $("#reading").appendChild(adCard(r.ad));
   $("#resActions").style.display = "block";
   if (save) await saveHistory(r);
+}
+
+/* ================== ЗАМЕТКИ: «сбылось / не сбылось» ================== */
+function notesBlock(r) {
+  const el = document.createElement("div");
+  el.className = "notes";
+  el.innerHTML = `<div class="t">📝 Мой дневник</div>
+    <textarea maxlength="1000" placeholder="Что ты чувствуешь? Запиши мысли — потом сравнишь с тем, как всё сложилось"></textarea>
+    <div class="oc"><button class="yes">✅ Сбылось</button><button class="no">❌ Не сбылось</button></div>
+    <div class="saved"></div>`;
+  const ta = el.querySelector("textarea"), saved = el.querySelector(".saved");
+  ta.value = r.note || "";
+  const paint = () => el.querySelectorAll(".oc button").forEach(b => b.classList.toggle("on", b.classList.contains(r.outcome || "-")));
+  paint();
+  const save = async () => {
+    try { await api("note", { id: r.id, note: ta.value, outcome: r.outcome || null }); r.note = ta.value; saved.textContent = "Сохранено ✓"; setTimeout(() => saved.textContent = "", 1800); }
+    catch (e) { saved.textContent = ""; toast("Не удалось сохранить заметку"); }
+  };
+  ta.onblur = () => { if (ta.value !== (r.note || "")) save(); };
+  el.querySelectorAll(".oc button").forEach(b => b.onclick = () => {
+    haptic(); const v = b.classList.contains("yes") ? "yes" : "no";
+    r.outcome = r.outcome === v ? null : v; paint(); save();
+  });
+  return el;
 }
 
 /* ================== РЕКЛАМА (настраивается в боте: /admin) ================== */
@@ -597,17 +941,26 @@ async function saveHistory(r) {
   store.set("history", JSON.stringify(h));
 }
 async function renderHistory() {
-  const h = await loadHistory();
+  // с сервером — общая история с заметками; без него — из облака Telegram / браузера
+  let h;
+  if (ME) {
+    try {
+      h = (await api("history")).items.map(it => ({ id: it.id, s: it.spread, q: it.question || "", d: Date.parse(it.created),
+        c: it.cards, note: it.note || "", outcome: it.outcome || null }));
+    } catch (e) { h = null; }
+  }
+  if (!h) h = await loadHistory();
   if (!h.length) { $("#histList").innerHTML = `<div class="empty">Пока пусто.<br>Сделай первый расклад ✨</div>`; return; }
   $("#histList").innerHTML = h.map((it, i) => {
-    const sp = SPREADS.find(s => s.id === it.s); if (!sp) return "";
+    const sp = spreadById[it.s]; if (!sp) return "";
     const names = it.c.map(([id]) => byId[id] ? byId[id].name : "?").join(" · ");
-    return `<div class="hist-item" data-i="${i}"><div class="d">${new Date(it.d).toLocaleString("ru-RU", { day:"numeric", month:"long", hour:"2-digit", minute:"2-digit" })} · ${sp.ico} ${sp.name}</div>
+    const marks = (it.outcome === "yes" ? " ✅" : it.outcome === "no" ? " ❌" : "") + (it.note ? " 📝" : "");
+    return `<div class="hist-item" data-i="${i}"><div class="d">${new Date(it.d).toLocaleString("ru-RU", { day:"numeric", month:"long", hour:"2-digit", minute:"2-digit" })} · ${sp.ico} ${sp.name}${marks}</div>
       ${it.q ? `<div class="c"><i>«${esc(it.q)}»</i></div>` : ""}<div class="c">${names}</div></div>`;
   }).join("");
   document.querySelectorAll(".hist-item").forEach(el => el.onclick = () => {
     const it = h[+el.dataset.i];
-    current = { spread: SPREADS.find(s => s.id === it.s), question: it.q, date: it.d,
+    current = { spread: spreadById[it.s], question: it.q, date: it.d, id: it.id, note: it.note, outcome: it.outcome,
       cards: it.c.map(([id, rv]) => ({ card: byId[id], reversed: !!rv })) };
     renderResult(current, true);
     show("result");
@@ -674,19 +1027,36 @@ function renderProfile() {
     <div class="box"><h3>🔮 Купить расклады</h3><p>1 расклад = любой расклад на выбор. Не сгорают.</p>${packsHtml()}</div>
     <div class="box"><h3>🎁 Пригласи друга</h3><p>За каждого друга — +${ME.refBonus} расклада тебе и ему. Приглашено: <b>${ME.refs}</b></p>
       <div class="reflink">${esc(ME.refLink)}</div><button class="btn" id="invBtn">Пригласить</button></div>
+    <div class="box"><h3>🎟 Промокод</h3><p>Есть код от нас или от блогера? Введи его здесь.</p>
+      <div style="display:flex;gap:8px;margin-top:10px"><input class="inp" id="promoInp" placeholder="Например, LUNA2026" style="text-transform:uppercase">
+      <button class="btn" id="promoBtn" style="width:auto;margin:0;padding:0 18px">ОК</button></div></div>
     ${settingsHtml()}`;
   bindBuy($("#profileBody"));
   $("#invBtn").onclick = invite;
+  $("#promoBtn").onclick = async () => {
+    const code = $("#promoInp").value.trim();
+    if (!code) return toast("Введи промокод");
+    haptic("medium");
+    try {
+      const d = await api("promo", { code });
+      setMe(d.me); toast((d.ok ? "🎉 " : "") + d.message);
+      if (d.ok) { haptic("ok"); sfx.chime(); renderProfile(); }
+    } catch (e) { toast("Не удалось проверить промокод"); }
+  };
   bindSettings();
 }
 function settingsHtml() {
+  const hours = Array.from({ length: 18 }, (_, i) => i + 6);
   return `<div class="box"><h3>⚙️ Настройки</h3>
-    ${ME ? `<div class="row"><span>☀️ «Карта дня» в ${ME.dailyHour}:00</span><div class="switch${ME.daily ? " on" : ""}" id="swDaily"></div></div>` : ""}
+    ${ME ? `<div class="row"><span>☀️ «Карта дня» в чат</span><div class="switch${ME.daily ? " on" : ""}" id="swDaily"></div></div>
+    <div class="row"><span>🕘 Присылать в</span><select class="inp" id="selHour">${hours.map(h =>
+      `<option value="${h}"${h === ME.dailyHour ? " selected" : ""}>${String(h).padStart(2, "0")}:00</option>`).join("")}</select></div>` : ""}
     <div class="row"><span>🔊 Звуки</span><div class="switch${soundOn ? " on" : ""}" id="swSound"></div></div></div>`;
 }
 function bindSettings() {
   $("#swSound").onclick = (e) => { soundOn = !soundOn; lset("sound", soundOn ? "1" : "0"); e.target.classList.toggle("on", soundOn); updateSoundChip(); haptic(); };
   if ($("#swDaily")) $("#swDaily").onclick = async (e) => { haptic(); e.target.classList.toggle("on"); await loadMe({ daily: e.target.classList.contains("on") }); toast(ME && ME.daily ? "«Карта дня» включена" : "«Карта дня» выключена"); };
+  if ($("#selHour")) $("#selHour").onchange = async (e) => { haptic(); await loadMe({ dailyHour: +e.target.value }); toast(`Буду присылать «Карту дня» в ${e.target.value}:00 (МСК)`); };
 }
 
 /* ================== КАРТИНКА ДЛЯ СТОРИС ================== */
@@ -770,7 +1140,141 @@ function openCard(c) {
 function closeModal() { $("#modal").classList.remove("open"); }
 $("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
 
-renderSpreads();
+/* ================== ЛУНА ================== */
+function moonInfo(date = new Date()) {
+  const forced = new URLSearchParams(location.search).get("moon");  // ?moon=full / ?moon=new — для предпросмотра
+  const P = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14);
+  let age = (((date - ref) / 864e5) % P + P) % P;
+  if (forced === "full") age = 14.8; else if (forced === "new") age = 0.4;
+  const ill = Math.round((1 - Math.cos(2 * Math.PI * age / P)) / 2 * 100);
+  const phases = [
+    [1.5, "🌑", "Новолуние", "время загадывать желания и начинать новое"],
+    [6.4, "🌒", "Растущий серп", "хорошо начинать дела и строить планы"],
+    [8.4, "🌓", "Первая четверть", "время действовать и преодолевать"],
+    [13.3, "🌔", "Растущая Луна", "энергия растёт — притягивай желаемое"],
+    [16.3, "🌕", "Полнолуние", "эмоции на пике, тайное становится явным"],
+    [21.1, "🌖", "Убывающая Луна", "время отпускать и наводить порядок"],
+    [23.1, "🌗", "Последняя четверть", "подводи итоги и завершай"],
+    [28.0, "🌘", "Убывающий серп", "отдыхай и готовься к новому циклу"],
+    [99, "🌑", "Новолуние", "время загадывать желания и начинать новое"]];
+  const [, ico, name, tip] = phases.find(p => age < p[0]);
+  const special = age >= 13.3 && age < 16.3 ? "fullmoon" : (age < 1.5 || age >= 28) ? "newmoon" : null;
+  return { ico, name, tip, ill, special };
+}
+function renderMoon() {
+  const m = moonInfo(), bar = $("#moonBar");
+  bar.className = "moon" + (m.special ? " special" : "");
+  bar.innerHTML = `<div class="mi">${m.ico}</div><div><b>${m.name} · ${m.ill}%</b>${m.tip}</div>` +
+    (m.special ? `<div class="go">Особый расклад ›</div>` : "");
+  bar.onclick = m.special ? () => { haptic(); selectedSpread = spreadById[m.special]; $("#question").value = ""; openAsk("home"); } : null;
+}
+
+/* ================== МАТРИЦА СУДЬБЫ ================== */
+function miniCard(id) { return `<div class="mini">${cardFace(byId[id], false)}</div>`; }
+function openMatrix() {
+  const saved = lget("bdate", "");
+  if (saved) { $("#mxDate").value = saved; $("#cpD1").value = saved; }
+  const today = new Date().toISOString().slice(0, 10);
+  ["#mxDate", "#cpD1", "#cpD2"].forEach(s => $(s).max = today);
+  show("matrix");
+}
+document.querySelectorAll("#mxTabs button").forEach(b => b.onclick = () => {
+  haptic();
+  document.querySelectorAll("#mxTabs button").forEach(x => x.classList.toggle("active", x === b));
+  $("#mxMine").style.display = b.dataset.t === "mine" ? "" : "none";
+  $("#mxPair").style.display = b.dataset.t === "pair" ? "" : "none";
+});
+async function loadMatrix(unlock) {
+  const date = $("#mxDate").value;
+  if (!date) return toast("Выбери дату рождения");
+  if (!ME) return toast("Матрица доступна при запуске через бота");
+  lset("bdate", date);
+  haptic("medium");
+  try {
+    const d = await api("matrix", { date, unlock: !!unlock });
+    setMe(d.me);
+    renderMatrix(d);
+    if (unlock) { haptic("ok"); sfx.chime(); }
+  } catch (e) {
+    if (e.status === 402) { if (e.data.me) setMe(e.data.me); openShop("Полная матрица — за 1 расклад"); }
+    else toast("Проверь дату рождения");
+  }
+}
+function renderMatrix(d) {
+  const p = d.personal;
+  let html = `<div class="arc hero-arc">${miniCard(p.card)}<div><div class="t">Аркан личности · ${p.num}</div>
+    <h3><span>${p.name}</span></h3><p>${p.text}</p><p>✦ ${p.plus}</p></div></div>`;
+  if (d.full) {
+    html += d.points.map((x, i) => `<div class="arc" style="animation-delay:${i * 70}ms">${miniCard(x.card)}<div>
+      <div class="t">${x.title}</div><h3>${x.num} · <span>${x.name}</span></h3><p>${x.text}</p></div></div>`).join("");
+  } else {
+    const price = ME.sub ? "бесплатно по безлимиту" : ME.credits > 0 ? `спишется 1 расклад · на балансе ${ME.credits}` : "за 1 расклад";
+    html += `<div class="locked"><div class="t" style="font-size:12px;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🔒 Полная матрица</div>
+      ${d.locked.map(t => `<div class="row2"><span>${t}</span><span>Аркан ██</span></div>`).join("")}
+      <button class="btn gold" id="mxUnlock">✨ Открыть полную матрицу</button>
+      <div class="center cost">${price} · откроется навсегда</div></div>`;
+  }
+  $("#mxRes").innerHTML = html;
+  if ($("#mxUnlock")) $("#mxUnlock").onclick = () => loadMatrix(true);
+  $("#mxRes").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("#mxGo").onclick = () => loadMatrix(false);
+$("#cpGo").onclick = async () => {
+  const d1 = $("#cpD1").value, d2 = $("#cpD2").value;
+  if (!d1 || !d2) return toast("Укажи обе даты рождения");
+  if (!ME) return toast("Совместимость доступна при запуске через бота");
+  lset("bdate", d1); haptic("medium");
+  try {
+    const c = await api("compat", { d1, d2 });
+    const col = c.score >= 85 ? "#7ee0a1" : c.score >= 72 ? "#d4af37" : "#c4a8ff";
+    $("#cpRes").innerHTML = `
+      <div class="ring" style="background:conic-gradient(${col} ${c.score * 3.6}deg, #ffffff14 0)"><div><span><b>${c.score}%</b><small>совместимость</small></span></div></div>
+      <div class="pairline">${miniCard(c.you.card)}<span>${c.you.name}<br><small style="color:var(--hint)">ты</small></span>
+        <span style="font-size:22px">💞</span>
+        <span style="text-align:right">${c.partner.name}<br><small style="color:var(--hint)">партнёр</small></span>${miniCard(c.partner.card)}</div>
+      <div class="arc hero-arc">${miniCard(c.pair.card)}<div><div class="t">Аркан пары · ${c.pair.num}</div><h3><span>${c.pair.name}</span></h3><p>${c.pair.text}</p></div></div>
+      <div class="arc"><div><div class="t">💪 Сила вашей пары</div><p>${c.strength}</p></div></div>
+      <div class="arc"><div><div class="t">🌱 Над чем работать</div><p>${c.work}</p></div></div>
+      <button class="btn" id="cpShare">💌 Отправить партнёру</button>`;
+    $("#cpShare").onclick = () => {
+      const text = `💞 Наша совместимость по Матрице судьбы — ${c.score}%! Аркан пары: ${c.pair.name}. Проверь свою в «Полночном Аркане» 🌙`;
+      const url = "https://t.me/share/url?url=" + encodeURIComponent(ME.refLink) + "&text=" + encodeURIComponent(text);
+      inTg ? tg.openTelegramLink(url) : (navigator.clipboard && navigator.clipboard.writeText(text + " " + ME.refLink), toast("Текст скопирован"));
+    };
+    sfx.chime();
+    $("#cpRes").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { toast("Проверь даты рождения"); }
+};
+
+/* ================== КВИЗ «УЧИ ТАРО» ================== */
+const quiz = { score: 0, total: 0, streak: 0, best: +lget("quizBest", "0") };
+function quizQuestion() {
+  const pool = Math.random() < .6 ? DECK.filter(c => c.arcana === "major") : DECK;
+  const card = pool[Math.floor(Math.random() * pool.length)];
+  const same = DECK.filter(c => c.id !== card.id && (card.arcana === "major" ? c.arcana === "major" : c.arcana !== "major"));
+  const opts = [card, ...same.sort(() => Math.random() - .5).slice(0, 3)].sort(() => Math.random() - .5);
+  const byMeaning = Math.random() < .4;
+  $("#sheet").innerHTML = `<div class="qscore"><span>✅ ${quiz.score} из ${quiz.total}</span><span>🔥 серия ${quiz.streak} · рекорд ${quiz.best}</span></div>
+    <h2 style="margin-top:10px">${byMeaning ? "Какой карте подходит значение?" : "Как называется эта карта?"}</h2>
+    ${byMeaning ? `<div class="kwq">${card.kwUp}</div>` : `<div class="quiz-card">${cardFace(card, false)}</div>`}
+    <div class="qopts">${opts.map(o => `<button class="qopt" data-id="${o.id}">${o.sym} ${o.name}</button>`).join("")}</div>
+    <div id="qAfter"></div>`;
+  document.querySelectorAll(".qopt").forEach(b => b.onclick = () => {
+    if (document.querySelector(".qopt.right")) return;
+    const ok = b.dataset.id === card.id;
+    quiz.total++;
+    if (ok) { quiz.score++; quiz.streak++; haptic("ok"); sfx.flip(); } else { quiz.streak = 0; haptic("heavy"); b.classList.add("wrong"); }
+    if (quiz.streak > quiz.best) { quiz.best = quiz.streak; lset("quizBest", String(quiz.best)); }
+    $(".qscore").innerHTML = `<span>✅ ${quiz.score} из ${quiz.total}</span><span>🔥 серия ${quiz.streak} · рекорд ${quiz.best}</span>`;
+    document.querySelector(`.qopt[data-id="${card.id}"]`).classList.add("right");
+    $("#qAfter").innerHTML = `<div class="box" style="margin-top:12px"><h3>${card.name}</h3><p>${card.kwUp}. ${card.up}</p></div>
+      <button class="btn" id="qNext">Дальше ›</button><button class="btn ghost" onclick="closeModal()">Закончить</button>`;
+    $("#qNext").onclick = quizQuestion;
+  });
+}
+$("#quizBtn").onclick = () => { haptic(); quiz.score = quiz.total = quiz.streak = 0; quizQuestion(); $("#modal").classList.add("open"); };
+
+renderHome();
 renderDeck();
 loadMe();
 </script>
